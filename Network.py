@@ -6,14 +6,12 @@ np.random.seed(1)
 
 
 X = np.array([
+    [0, 0],
     [0, 1],
     [1, 0],
-    [1, 1],
-    [1, 2],
-    [2, 2],
-    [2, 3],
-    [3, 2]])
-Y = np.array([[1, 1, 2, 3, 4, 5, 5]]).T
+    [1, 1]
+])
+Y = np.array([[0, 0, 1, 1]]).T
 
 
 def sigmoid(x, deriv=False):
@@ -22,49 +20,29 @@ def sigmoid(x, deriv=False):
     return 1/(1+np.exp(-x))
 
 
-syn = np.array(range(0, len(layers_nodes) - 1), dtype=object)
-node = np.array(range(0, len(layers_nodes)), dtype=object)
+syn = np.array(range(len(layers_nodes) - 1), dtype=object)
+node = np.array(range(len(layers_nodes)), dtype=object)
 
 
-for l in range(0, len(syn)):
-    syn[l] = np.random.random((layers_nodes[l + 1], layers_nodes[l]))
+for l in range(len(syn)):
+    syn[l] = 2 * np.random.random((layers_nodes[l + 1], layers_nodes[l])) - 1
 
-for n in range(0, len(node)):
-    node[n] = np.array(range(0, layers_nodes[n]))
+for n in range(len(node)):
+    node[n] = np.array(range(layers_nodes[n]))
 
-node[0] = X[0]
-
-#print(syn[0])
-#print("\n")
-#print(node[0])
-
-
-
+node_max_index = len(node) - 1
+syn_max_index = len(syn) - 1
 
 for i in range(15000):
-
-    for e in range(0, len(X)):
-
-        node[e] = X[e]
-
+    for e in range(len(X)):
+        node[0] = X[e]
         # forward propagation
-        for l in range(0, len(node)):
+        for l in range(node_max_index):
             node[l + 1] = sigmoid(np.dot(syn[l], node[l]))
 
-        for l in range(0, len(node)):
-            error = Y[e] - node[len(layers_nodes) - 1]
-
-
-
-        # error and delta calculation
-
-
-        # update synapses
-        #for l in range(0, len(syn)):
-        #    delta = error * sigmoid(node[l + 1], True)
-        #    syn[0] += np.dot(l0.T, delta)
-
-print(node[len(node) - 1])
-
-
+        # back propagation
+        for l in range(node_max_index):
+            error = Y[e] - node[node_max_index]     #dE / dyj
+            delta = error * sigmoid(node[node_max_index - l], True)     #dE / dzj
+            syn[syn_max_index - l] += np.dot(node[node_max_index - l], delta)   #dE / dwij
 
