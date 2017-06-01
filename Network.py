@@ -1,36 +1,43 @@
+from mnist import MNIST
 import numpy as np
+import time
+
 
 # learning speed coefficient
-eta = 0.1
+eta = 
 
 # number of training iterations
-max_training_steps = 1000
+max_training_steps = 20
+min_expected_error = 0
+
 # number of nodes per network layer
-layers_nodes = np.array([2, 4, 8, 8, 4, 2], dtype=int)
+layers_nodes = np.array([784, 10, 10], dtype=int)
 # random seed for synapses weight initialization
 np.random.seed(5)
-
-# training input data
-X = np.array([
-    [0, 0],
-    [0, 1],
-    [1, 0],
-    [1, 1],
-])
-# training expected data
-Y = np.array([
-    [0, 1],
-    [1, 0],
-    [1, 1],
-    [0, 0]
-])
-
 
 # sigmoid activation function
 def sigmoid(x, d=False):
     if d:
         return x*(1-x)
-    return 1/(1+np.exp(-x))
+    s = np.clip(x, -500, 500)
+    return 1/(1+np.exp(-s))
+
+
+mndata = MNIST('samples')
+images, labels = mndata.load_training()
+expected = np.array(np.array(range(len(images)), dtype=object))
+for l in labels:
+    e = np.zeros(10)
+    e[l] = 1
+    expected[l] = e
+    images[l] = sigmoid(images[l])
+
+# training input data
+X = images
+# training expected data
+Y = expected
+
+
 
 
 # activation function being used in the network
@@ -56,6 +63,7 @@ for n in range(len(node)):
     node[n] = np.array(range(0, layers_nodes[n]))
 
 # network training section
+training_start_time = time.time()
 for i in range(max_training_steps):
 
     # iterate through training data entries
@@ -77,13 +85,24 @@ for i in range(max_training_steps):
             delta = eta * error[s] * activation_function(node[s + 1], d=True)
             syn[s] += np.dot(np.reshape(delta, (len(delta), 1)), np.reshape(node[s], (len(node[s]), 1)).T)
 
-    print("Error: " + str(total_error))
+    if min_expected_error >= total_error:
+        break
+
+training_end_time = time.time()
+print("Error: %.5f" % total_error)
+print("Iterations: " + str(i))
+print("Training elapsed time: %.2fs" % float(training_end_time - training_start_time))
+
 
 # prediction section
-node[0] = X[2]
+prediction_start_time = time.time()
+node[0] = X[0]
 for l in range(max_index_node):
     node[l + 1] = activation_function(np.dot(syn[l], node[l]))
-print(node[max_index_node])
+
+prediction_end_time = time.time()
+print("Result: " + str(node[max_index_node]))
+print("Prediction elapsed time: %.2fs" % float(prediction_end_time - prediction_start_time))
 
 
 
