@@ -1,11 +1,14 @@
 import numpy as np
 from Utils import sigmoid
 
+from PIL import Image
+
 
 def activation_function(x, d=False):
     return sigmoid(x, d)
 
 
+# this class produces a fully connected neural network
 class FullyConnectedNetwork:
 
     # initializer
@@ -67,3 +70,68 @@ class FullyConnectedNetwork:
         for l in range(self.max_index_node):
             self.node[l + 1] = activation_function(np.dot(self.syn[l], self.node[l]))
         return self.node[self.max_index_node]
+
+
+# this class performs the convolution operation in a source image
+class ConvolutionLayer:
+
+    # initializer
+    def __init__(self):
+        print("hi")
+
+    #
+    def convolution(self, source, step):
+
+        #o_pix = np.arange(42 * 3).reshape(6, 7, 3)
+        #kernel = np.arange(9).reshape(3, 3, 3)
+
+        kernel = np.array([
+            [[-1, -1, -1], [-1,  8, -1], [-1, -1, -1]],
+            [[-1, -1, -1], [-1,  8, -1], [-1, -1, -1]],
+            [[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]],
+        ])
+
+        o_img = Image.open("resources/111.png")
+        o_pix = np.array(o_img)
+
+        o_rows = o_pix.shape[0]
+        o_cols = o_pix.shape[1]
+
+        k_rows = kernel.shape[0]
+        k_cols = kernel.shape[1]
+
+        r_rows = o_rows - k_rows + 1
+        r_cols = o_cols - k_cols + 1
+
+        r_data = np.zeros((r_rows, r_cols, 3), dtype=np.uint8)
+
+        print("Original")
+        print(o_pix)
+
+        print("Kernel")
+        print(kernel)
+
+        print("\n")
+        for r in range(r_rows):
+            for c in range(r_cols):
+                sub_matrix = o_pix[r:r+k_rows, c:c+k_cols]
+                result = sub_matrix * kernel
+                r_sum = sum(result)
+                r_data[r][c] = sum(r_sum)
+
+                print("Submatrix " + str(r) + " " + str(c))
+                print(result)
+                print("Result")
+                #rint(result0.shape)
+                print(r_sum)
+                #print("\n")
+            #print("\n")
+
+
+        #print(r_data)
+
+
+        r_img = Image.fromarray(r_data, 'RGB')
+        r_img.save('resources/out.png')
+
+        return 0

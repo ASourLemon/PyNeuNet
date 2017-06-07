@@ -1,5 +1,6 @@
 import numpy as np
 from Network import FullyConnectedNetwork
+from Network import ConvolutionLayer
 
 
 s = np.array([
@@ -23,13 +24,16 @@ s = np.array([
 e = np.array([0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 1])
 
 
-net = FullyConnectedNetwork(np.array([5, 8, 1], dtype=int))
-print("Before")
-for i in s:
-    print(net.test(i))
+conv = ConvolutionLayer()
+conv.convolution("", "")
 
 
-net.train(source=s, expected=e, repeat=150000, eta=0.1)
-print("After")
-for i in s:
-    print(net.test(i))
+
+#net = FullyConnectedNetwork(np.array([5, 8, 1], dtype=int))
+#print("Before")
+#for i in s:
+#    print(net.test(i))
+#net.train(source=s, expected=e, repeat=150000, eta=0.1)
+#print("After")
+#or i in s:
+#   print(net.test(i))
