@@ -82,20 +82,23 @@ class ConvolutionLayer:
     #
     def convolution(self, source, step):
 
-        #o_pix = np.arange(42 * 3).reshape(6, 7, 3)
+        o_pix = np.arange(6 * 6 * 3).reshape(6, 6, 3)
         #kernel = np.arange(9).reshape(3, 3, 3)
 
-        kernel = np.array([
-            [[-1, -1, -1], [-1,  8, -1], [-1, -1, -1]],
-            [[-1, -1, -1], [-1,  8, -1], [-1, -1, -1]],
-            [[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]],
-        ])
+        kernel = np.array([[0, 0, 0], [0,  1, 0], [0, 0, 0]])
 
-        o_img = Image.open("resources/111.png")
-        o_pix = np.array(o_img)
+        #o_img = Image.open("resources/111.png")
+        #o_pix = np.array(o_img)
+        #r_img = Image.fromarray(o_pix, 'RGB')
+        #r_img.save('resources/out.png')
+
+        #n_pad = ((1, 1), (1, 1), (0, 0))
+        #o_pix = np.pad(o_pix, pad_width=n_pad, mode='constant', constant_values=0)
+
 
         o_rows = o_pix.shape[0]
         o_cols = o_pix.shape[1]
+        print(o_rows)
 
         k_rows = kernel.shape[0]
         k_cols = kernel.shape[1]
@@ -103,35 +106,44 @@ class ConvolutionLayer:
         r_rows = o_rows - k_rows + 1
         r_cols = o_cols - k_cols + 1
 
-        r_data = np.zeros((r_rows, r_cols, 3), dtype=np.uint8)
+        r_data = np.zeros((3, r_cols, r_rows), dtype=np.int8)
 
         print("Original")
         print(o_pix)
 
-        print("Kernel")
-        print(kernel)
+        #print("Kernel")
+        #print(kernel)
 
         print("\n")
-        for r in range(r_rows):
-            for c in range(r_cols):
-                sub_matrix = o_pix[r:r+k_rows, c:c+k_cols]
-                result = sub_matrix * kernel
-                r_sum = sum(result)
-                r_data[r][c] = sum(r_sum)
 
-                print("Submatrix " + str(r) + " " + str(c))
-                print(result)
-                print("Result")
+        for c in range(r_cols):
+
+            for r in range(r_rows):
+
+                #sub_matrix = o_pix[r:r+k_rows, c:c+k_cols]
+                #result = kernel * sub_matrix
+
+#                r_sum = sum(result[0])
+#                g_sum = sum(result[1])
+#                b_sum = sum(result[2])
+
+ #               r_data[0][c][r] = sum(r_sum)
+#                r_data[1][c][r] = sum(g_sum)
+ #               r_data[2][c][r] = sum(b_sum)
+
+                #print("Submatrix " + str(r) + " " + str(c))
+                #print(result)
+                #print("Result")
                 #rint(result0.shape)
-                print(r_sum)
+                #print(r_sum)
                 #print("\n")
             #print("\n")
 
 
         #print(r_data)
-
-
-        r_img = Image.fromarray(r_data, 'RGB')
+        #print(o_pix)
+        #print(r_data)
+        r_img = Image.fromarray(r_data.T, 'RGB')
         r_img.save('resources/out.png')
 
         return 0
