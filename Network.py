@@ -8,7 +8,7 @@ def activation_function(x, d=False):
 
 class FullyConnectedNetwork:
 
-    #
+    # initializer
     def __init__(self, layers):
 
         self.layers_nodes = layers
@@ -47,9 +47,11 @@ class FullyConnectedNetwork:
 
                 # error back-propagation
                     self.error[self.max_index_error] = expected[e] - self.node[self.max_index_node]
-                total_error = sum(self.error[self.max_index_error])
+                #total_error = sum(self.error[self.max_index_error])
                 for l in range(1, len(self.error)):
-                    self.error[self.max_index_error - l] = np.dot(self.syn[self.max_index_syn - l + 1].T, self.error[self.max_index_error - l + 1])
+                    self.error[self.max_index_error - l] =\
+                        np.dot(self.syn[self.max_index_syn - l + 1].T,
+                               self.error[self.max_index_error - l + 1])
 
                 # synapses weight coefficients adjustment
                 for s in range(0, len(self.syn)):
