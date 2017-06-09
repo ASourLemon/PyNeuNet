@@ -1,6 +1,8 @@
 import numpy as np
+from PIL import Image
 from Network import FullyConnectedNetwork
 from Network import ConvolutionLayer
+from Network import RectifiedLinearUnit
 
 
 s = np.array([
@@ -23,9 +25,27 @@ s = np.array([
 ])
 e = np.array([0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 1])
 
+im = Image.open("resources/bernas0.jpg")
+kernel = np.array(
+    [
+        [[-1, -1, -1],
+         [-1, 8, -1],
+         [-1, -1, -1]],
 
-conv = ConvolutionLayer()
-conv.convolution("", "")
+        [[-1, -1, -1],
+         [-1, 8, -1],
+         [-1, -1, -1]],
+
+        [[-1, -1, -1],
+         [-1, 8, -1],
+         [-1, -1, -1]],
+    ]
+)
+feature = ConvolutionLayer.convolution(im, kernel)
+feature.save('resources/l0.jpg')
+
+r_feature = RectifiedLinearUnit.rectify(feature)
+feature.save('resources/l1.jpg')
 
 
 

@@ -1,7 +1,7 @@
 import numpy as np
 from Utils import sigmoid
-
 from PIL import Image
+
 
 
 def activation_function(x, d=False):
@@ -75,75 +75,63 @@ class FullyConnectedNetwork:
 # this class performs the convolution operation in a source image
 class ConvolutionLayer:
 
-    # initializer
-    def __init__(self):
-        print("hi")
+    # performs convolution
+    @staticmethod
+    def convolution(source, kernel, row_step=1, col_step=1):
 
-    #
-    def convolution(self, source, step):
-
-        o_pix = np.arange(6 * 6 * 3).reshape(6, 6, 3)
-        #kernel = np.arange(9).reshape(3, 3, 3)
-
-        kernel = np.array([[0, 0, 0], [0,  1, 0], [0, 0, 0]])
-
-        #o_img = Image.open("resources/111.png")
-        #o_pix = np.array(o_img)
-        #r_img = Image.fromarray(o_pix, 'RGB')
-        #r_img.save('resources/out.png')
-
-        #n_pad = ((1, 1), (1, 1), (0, 0))
-        #o_pix = np.pad(o_pix, pad_width=n_pad, mode='constant', constant_values=0)
-
-
+        # process original data
+        o_pix = np.array(source, dtype=float)
         o_rows = o_pix.shape[0]
         o_cols = o_pix.shape[1]
-        print(o_rows)
+        o_chans = o_pix.shape[2]
 
+        # find kernel dimensions
         k_rows = kernel.shape[0]
         k_cols = kernel.shape[1]
 
-        r_rows = o_rows - k_rows + 1
-        r_cols = o_cols - k_cols + 1
+        # compute zero padding dimensions
+        pad_rows = int((int(k_rows / 2) + (k_rows % 2)) / 2)
+        pad_cols = int((int(k_cols / 2) + (k_cols % 2)) / 2)
 
-        r_data = np.zeros((3, r_cols, r_rows), dtype=np.int8)
+        # compute result dimensions
+        r_rows = int(o_rows / row_step)
+        r_cols = int(o_cols / col_step)
 
-        print("Original")
-        print(o_pix)
+        # allocate result data
+        r_data = np.zeros((r_rows, r_cols, o_chans))
 
-        #print("Kernel")
-        #print(kernel)
+        # apply zeros border padding
+        padding_width = ((pad_rows, pad_rows), (pad_cols, pad_cols), (0, 0))
+        o_pix = np.pad(o_pix, pad_width=padding_width, mode='constant', constant_values=0)
 
-        print("\n")
+        # convolution
+        for r in range(0, o_rows, row_step):
+            for c in range(0, o_cols, col_step):
+                for chan in range(o_chans):
+                    sub_matrix = o_pix[r:r + k_rows, c:c + k_cols, chan]
+                    result = sum(sub_matrix * kernel[chan])
+                    r_data[r, c, chan] = sum(result)
 
-        for c in range(r_cols):
-
-            for r in range(r_rows):
-
-                #sub_matrix = o_pix[r:r+k_rows, c:c+k_cols]
-                #result = kernel * sub_matrix
-
-#                r_sum = sum(result[0])
-#                g_sum = sum(result[1])
-#                b_sum = sum(result[2])
-
- #               r_data[0][c][r] = sum(r_sum)
-#                r_data[1][c][r] = sum(g_sum)
- #               r_data[2][c][r] = sum(b_sum)
-
-                #print("Submatrix " + str(r) + " " + str(c))
-                #print(result)
-                #print("Result")
-                #rint(result0.shape)
-                #print(r_sum)
-                #print("\n")
-            #print("\n")
+        # produce feature
+        r_data = np.array(r_data, dtype=np.uint8)
+        feature = Image.fromarray(r_data, 'RGB')
+        return feature
 
 
-        #print(r_data)
-        #print(o_pix)
-        #print(r_data)
-        r_img = Image.fromarray(r_data.T, 'RGB')
-        r_img.save('resources/out.png')
+#
+class RectifiedLinearUnit:
 
-        return 0
+    #
+    @staticmethod
+    def rectify(source):
+
+        # alloc input data
+        o_pix = np.array(source, dtype=float)
+
+        # rectify data
+        r_data = np.clip(o_pix, 0, 255)
+
+        # produce rectified feature
+        r_data = np.array(r_data, dtype=np.uint8)
+        r_feature = Image.fromarray(r_data, 'RGB')
+        return r_feature
