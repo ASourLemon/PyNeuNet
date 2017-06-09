@@ -113,6 +113,7 @@ class ConvolutionLayer:
                     r_data[r, c, chan] = sum(result)
 
         # produce feature
+        r_data = np.clip(r_data, 0, 255)
         r_data = np.array(r_data, dtype=np.uint8)
         feature = Image.fromarray(r_data, 'RGB')
         return feature
@@ -129,9 +130,10 @@ class RectifiedLinearUnit:
         o_pix = np.array(source, dtype=float)
 
         # rectify data
-        r_data = np.clip(o_pix, 0, 255)
+        r_data = sigmoid(o_pix)
 
         # produce rectified feature
+        #r_data = np.clip(r_data, 0, 255)
         r_data = np.array(r_data, dtype=np.uint8)
         r_feature = Image.fromarray(r_data, 'RGB')
         return r_feature
