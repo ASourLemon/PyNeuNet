@@ -1,9 +1,10 @@
 import numpy as np
 from PIL import Image
-from Network import FullyConnectedNetwork
-from Network import ConvolutionLayer
-from Network import RectifiedLinearUnit
 
+from Network import ConvolutionLayer
+from Network import RectifiedLinearUnitLayer
+from Network import PoolingLayer
+from Network import FullyConnectedNetworkLayer
 
 s = np.array([
     [0, 0, 0, 0, 0],
@@ -25,7 +26,8 @@ s = np.array([
 ])
 e = np.array([0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 1])
 
-im = Image.open("resources/bernas0.jpg")
+im = Image.open("resources/0.jpg")
+im = np.array(im, dtype=float)
 kernel = np.array(
     [
         [[-1, -1, -1],
@@ -42,11 +44,27 @@ kernel = np.array(
     ]
 )
 feature = ConvolutionLayer.convolution(im, kernel)
-feature.save('resources/l0.jpg')
+feature = RectifiedLinearUnitLayer.rectify(feature)
+feature = ConvolutionLayer.convolution(feature, kernel)
+feature = RectifiedLinearUnitLayer.rectify(feature)
+feature = PoolingLayer.max(feature, np.zeros((2, 2)))
 
-r_feature = RectifiedLinearUnit.rectify(feature)
-feature.save('resources/l1.jpg')
+feature = ConvolutionLayer.convolution(im, kernel)
+feature = RectifiedLinearUnitLayer.rectify(feature)
+feature = ConvolutionLayer.convolution(feature, kernel)
+feature = RectifiedLinearUnitLayer.rectify(feature)
+feature = PoolingLayer.max(feature, np.zeros((2, 2)))
 
+feature = ConvolutionLayer.convolution(im, kernel)
+feature = RectifiedLinearUnitLayer.rectify(feature)
+feature = ConvolutionLayer.convolution(feature, kernel)
+feature = RectifiedLinearUnitLayer.rectify(feature)
+feature = PoolingLayer.max(feature, np.zeros((2, 2)))
+
+
+
+feature = Image.fromarray(feature)
+feature.save('resources/o1.jpg')
 
 
 #net = FullyConnectedNetwork(np.array([5, 8, 1], dtype=int))
