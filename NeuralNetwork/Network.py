@@ -50,10 +50,10 @@ class ConvolutionLayer:
         return r_data
 
 
-#
+# this class performs the ReLU operation
 class RectifiedLinearUnitLayer:
 
-    #
+    # performs ReLU
     @staticmethod
     def rectify(source):
         # rectify data
@@ -64,10 +64,10 @@ class RectifiedLinearUnitLayer:
         return r_data
 
 
-#
+# this class performs the pooling operation on a set of features
 class PoolingLayer:
 
-    #
+    # performs pooling
     @staticmethod
     def max(source, window):
 
@@ -99,7 +99,7 @@ class PoolingLayer:
 # this class produces a fully connected neural network
 class FullyConnectedNetworkLayer:
 
-    # initializer
+    # initializer - layers should be an array of integers, indicating the number os neurons each layer
     def __init__(self, layers):
 
         self.layers_nodes = layers
