@@ -1,10 +1,9 @@
 import numpy as np
 from PIL import Image
 
-from Network import ConvolutionLayer
-from Network import RectifiedLinearUnitLayer
-from Network import PoolingLayer
-from Network import FullyConnectedNetworkLayer
+from NeuralNetwork.Network import ConvolutionLayer
+from NeuralNetwork.Network import RectifiedLinearUnitLayer
+from NeuralNetwork.Network import PoolingLayer
 
 s = np.array([
     [0, 0, 0, 0, 0],

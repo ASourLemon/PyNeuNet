@@ -1,6 +1,5 @@
 import numpy as np
-from Utils import sigmoid
-from PIL import Image
+from Utilities.Utils import sigmoid
 
 
 def activation_function(x, d=False):
