@@ -1,13 +1,13 @@
 from PIL import Image
+from Utilities.Utils import bit_to_byte, byte_to_bit
 
 
 def hide():
 
-    secret = open('Resources/secret.png', 'rb')
-    bits = secret.read()
-    lim = len(bits)
-    print(lim)
-    bit = 0
+    secret = open('Resources/secret.txt', 'rb')
+    secret_bytes = secret.read()
+
+    bits = byte_to_bit(secret_bytes)
 
     image = Image.open('Resources/original.png', 'r')
     pixels = image.load()
@@ -15,13 +15,13 @@ def hide():
     w = size[0]
     h = size[1]
 
-
+    bit = 0
     for i in range(w):
         for j in range(h):
             r = pixels[i, j][0]
             g = pixels[i, j][1]
             b = pixels[i, j][2]
-            if bit < lim:
+            if bit < len(bits):
                 if bits[bit]:
                     r |= 1
                     g |= 1
@@ -30,10 +30,9 @@ def hide():
                     r &= ~1
                     g &= ~1
                     b &= ~1
-                    pixels[i, j] = (r, g, b)
-                    bit += 1
+                pixels[i, j] = (r, g, b)
+                bit += 1
     image.save('Resources/output.png')
-
 
 def show():
 
@@ -43,24 +42,21 @@ def show():
     w = size[0]
     h = size[1]
 
-    lim = 5969 * 8
-    bit = 0
-    bits = [range(lim)]
+    lim = 25 * 8
 
+    bits = []
     for i in range(w):
         for j in range(h):
-            if bit < lim:
-                break
-            r = pixels[i, j][0]
-            if r & 1:
-                bits[bit] = 1
-            else:
-                bits[bit] = 0
-            bit += 1
+            if len(bits) < lim:
+                r = pixels[i, j][0]
+                if r & 1:
+                    bits.append(1)
+                else:
+                    bits.append(0)
 
-    newFile = open("Resources/outsecret.png", "wb")
-    newFileByteArray = bytearray(bits)
-    newFile.write(newFileByteArray)
+    bytes = bit_to_byte(bits)
+    outsecret = open('Resources/outsecret.txt', 'wb')
+    outsecret.write(bytearray(bytes))
 
 hide()
 show()
