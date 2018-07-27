@@ -7,7 +7,7 @@ metadata_byte_length = 10
 def hide():
 
     # loads secret
-    secret = open('Resources/secret.png', 'rb')
+    secret = open('Resources/secret.txt', 'rb')
     secret_bytes = secret.read()
 
     # computes metadata
@@ -18,7 +18,7 @@ def hide():
     secret_bits = byte_to_bit(secret_bytes)
 
     # loads target
-    image = Image.open('Resources/original.png')
+    image = Image.open('Resources/a-cat-on-computer.png')
     pixels = image.load()
     size = image.size
     w = size[0]
@@ -72,7 +72,7 @@ def show():
     data_bytes = bit_to_byte(data_bits)
 
     # write to disk
-    secret = open('Resources/outsecret.png', 'wb')
+    secret = open('Resources/outsecret.txt', 'wb')
     secret.write(bytearray(data_bytes))
 
 hide()
