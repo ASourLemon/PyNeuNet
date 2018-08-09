@@ -3,14 +3,14 @@ from PIL import Image
 import scipy.misc as smp
 from Utilities.Utils import bit_to_byte, byte_to_bit
 
-metadata_byte_length = 10
-result_width = 500
-result_height = 500
+metadata_byte_length = 15
+result_width = 5000
+result_height = 5000
 
 def hide():
 
     # loads secret
-    secret = open('Resources/secret.txt', 'rb')
+    secret = open('Resources/music.mp3', 'rb')
     secret_bytes = secret.read()
 
     print(len(secret_bytes))
@@ -21,13 +21,15 @@ def hide():
     # convert data to bits
     secret_bits = byte_to_bit(secret_bytes)
 
-    result_data = np.zeros((result_height, result_width, 3))
+    result_data = np.zeros((result_height, result_width, 4))
     secret_bit = 0
-    for i in range(result_width):
-        for j in range(result_height):
+    for i in range(result_height):
+        for j in range(result_width):
             if secret_bit < len(secret_bits) and secret_bits[secret_bit]:
-                pixel = (255, 255, 255)
-                result_data[j, i] = pixel
+                pixel = (255, 255, 255, 255)
+            else:
+                pixel = (0, 0, 0, 255)
+            result_data[i, j] = pixel
             secret_bit += 1
 
     image = smp.toimage(result_data)
@@ -38,7 +40,7 @@ def show():
     # loads result
     image = Image.open('Resources/output.png', 'r')
     pixels = np.array(image).flatten()
-    resolution = len(pixels)
+    resolution = int(len(pixels) / 4)
 
     # splits data and metadata
     metadata_bit_length = metadata_byte_length * 8
@@ -53,7 +55,7 @@ def show():
             data_byte_length = (data_byte_length << 1) | 1
         else:
             data_byte_length = (data_byte_length << 1) | 0
-    data_bit_length = min(int(data_byte_length) * 8, resolution)
+    data_bit_length = min(int(data_byte_length) * 8, resolution - metadata_bit_length)
 
     # computes data
     data_bits = []
@@ -66,8 +68,5 @@ def show():
     secret = open('Resources/outsecret.mp3', 'wb')
     secret.write(bytearray(data_bytes))
 
-i = 1639928015
-v = i * 8
-
-#hide()
+hide()
 show()
