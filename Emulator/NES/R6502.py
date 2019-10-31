@@ -24,6 +24,8 @@ class R6502:
     # Extra required for Emulation
     def __init__(self):
 
+        self.total_cycles = 0
+
         self.reg_A = np.uint8(0)              # Accumulator
         self.reg_Y = np.uint8(0)              # Y Register
         self.reg_X = np.uint8(0)              # X Register
@@ -39,11 +41,12 @@ class R6502:
         self.flag_Z = False         # Zero
         self.flag_C = False         # Carry
 
-        self.working_location = np.uint16(0x0000)        # Stores the address to read operand
+        self.working_address = np.uint16(0x0000)        # Stores the address to read operand
         self.working_data = np.uint8(0)                  # Stores the operand to use
 
         self.bus = None
         self.current_instruction = None
+
 
 
     # public
@@ -63,20 +66,42 @@ class R6502:
         if self.current_instruction is None or self.current_instruction.cycles == 0:
             op_code = self.read(self.reg_PC)
             self.current_instruction = R6502_Instruction(op_code)
+            self.single_line_print()
             self.reg_PC += 1
 
             load_extra_cycles = self.load_instruction(self.current_instruction)
             execute_extra_cycles = self.execute_instruction(self.current_instruction)
             self.current_instruction.cycles += load_extra_cycles + execute_extra_cycles
 
-        self.current_instruction.cycles -= 1
 
+        self.current_instruction.cycles -= 1
+        self.total_cycles += 1
+
+
+    def single_line_print(self):
+        line = "[%04X]" % self.reg_PC
+        line += " %02X" % self.current_instruction.op_code
+        line += " A: " + str(self.reg_A)
+        line += " X: " + str(self.reg_X)
+        line += " Y: " + str(self.reg_Y)
+        p = (int(self.flag_N) << 7) | \
+            (int(self.flag_V) << 6) | \
+            (int(self.flag_U) << 5) | \
+            (int(self.flag_B) << 4) | \
+            (int(self.flag_D) << 3) | \
+            (int(self.flag_I) << 2) | \
+            (int(self.flag_Z) << 1) | \
+            (int(self.flag_C) << 0)
+        line += " P: " + str(p)
+        line += " CYC: " + str(self.total_cycles)
+
+        print(line)
 
 
     def print_contents(self):
         print("A: " + " [%02X]" % self.reg_A + " " + str(self.reg_A))
         print("X: " + " [%02X]" % self.reg_X + " " + str(self.reg_X))
-        print("PC: " + "[%02X]" % self.reg_PC + " " + str(self.reg_PC))
+        print("PC: " + "[%04X]" % self.reg_PC + " " + str(self.reg_PC))
         print("S: " + " [%02X]" % self.reg_S + " " + str(self.reg_S))
         print()
         print("N: " + str(self.flag_N))
@@ -97,7 +122,7 @@ class R6502:
         self.bus.write(address, data)
 
     def load_memory_location(self):
-        self.working_data = self.read(self.working_location)
+        self.working_data = self.read(self.working_address)
 
     # Stack
     def push(self, value):
@@ -127,13 +152,13 @@ class R6502:
 
     # Immediate Address [IMM]
     def imm(self):
-        self.working_location = self.reg_PC
+        self.working_address = self.reg_PC
         self.reg_PC += 1
         return 0
 
     # Accumulator Addressing [Accum]
     def acc(self):
-        self.working_location = self.reg_A
+        self.working_address = self.reg_A
         return 0
 
     # Absolute Addressing [Absolute]
@@ -142,7 +167,7 @@ class R6502:
         self.reg_PC += 1
         high_bits = self.read(self.reg_PC)
         self.reg_PC += 1
-        self.working_location = (high_bits << 8) | low_bits
+        self.working_address = (high_bits << 8) | low_bits
         return 0
 
     # X Index Absolute Addressing [ABS, X]
@@ -151,10 +176,10 @@ class R6502:
         self.reg_PC += 1
         high_bits = self.read(self.reg_PC)
         self.reg_PC += 1
-        self.working_location = (high_bits << 8) | low_bits
-        self.working_location += self.reg_X
+        self.working_address = (high_bits << 8) | low_bits
+        self.working_address += self.reg_X
 
-        if (self.working_location & 0xFF00) != (high_bits << 8):
+        if (self.working_address & 0xFF00) != (high_bits << 8):
             return 1
         else:
             return 0
@@ -165,10 +190,10 @@ class R6502:
         self.reg_PC += 1
         high_bits = self.read(self.reg_PC)
         self.reg_PC += 1
-        self.working_location = (high_bits << 8) | low_bits
-        self.working_location += self.reg_Y
+        self.working_address = (high_bits << 8) | low_bits
+        self.working_address += self.reg_Y
 
-        if (self.working_location & 0xFF00) != (high_bits << 8):
+        if (self.working_address & 0xFF00) != (high_bits << 8):
             return 1
         else:
             return 0
@@ -176,30 +201,30 @@ class R6502:
 
     # Zero Page Addressing [ZP]
     def zpa(self):
-        self.working_location = self.read(self.reg_PC) & 0x00FF
+        self.working_address = self.read(self.reg_PC) & 0x00FF
         self.reg_PC += 1
         return 0
 
     # X Indexed Zero Page Addressing [ZP, X]
     def zpx(self):
-        self.working_location = (self.read(self.reg_PC) + self.reg_X) & 0x00FF
+        self.working_address = (self.read(self.reg_PC) + self.reg_X) & 0x00FF
         self.reg_PC += 1
         return 0
 
     # Y Indexed Zero Page Addressing [ZP, Y]
     def zpy(self):
-        self.working_location = (self.read(self.reg_PC) + self.reg_Y) & 0x00FF
+        self.working_address = (self.read(self.reg_PC) + self.reg_Y) & 0x00FF
         self.reg_PC += 1
         return 0
 
     # Relative Addressing [Relative]
     def rad(self):
 
-        self.working_location = self.read(self.reg_PC)
+        self.working_address = self.read(self.reg_PC)
         self.reg_PC += 1
 
-        if self.working_location & 0x80:
-            self.working_location |= 0xFF00
+        if self.working_address & 0x80:
+            self.working_address |= 0xFF00
 
         return 0
 
@@ -212,7 +237,7 @@ class R6502:
         low_bits = self.read(zp + self.reg_X) & 0x00FF
         high_bits = self.read(zp + self.reg_X + 1) & 0x00FF
 
-        self.working_location = (high_bits << 8) | low_bits
+        self.working_address = (high_bits << 8) | low_bits
         return 0
 
     # Indirect Indexed Addressing [(IND), Y]
@@ -224,10 +249,10 @@ class R6502:
         low_bits = self.read(zp & 0x00FF)
         high_bits = self.read(zp & 0x00FF)
 
-        self.working_location = (high_bits << 8) | low_bits
-        self.working_location += self.reg_Y
+        self.working_address = (high_bits << 8) | low_bits
+        self.working_address += self.reg_Y
 
-        if (self.working_location & 0xFF00) != (high_bits << 8):
+        if (self.working_address & 0xFF00) != (high_bits << 8):
             return 1
         else:
             return 0
@@ -243,7 +268,7 @@ class R6502:
         data_low = self.read(actual_ptr)
         data_high = self.read(actual_ptr + 1)
 
-        self.working_location = (data_high << 8) | data_low
+        self.working_address = (data_high << 8) | data_low
 
         return 0
 
@@ -264,24 +289,50 @@ class R6502:
 
     # B
     def BCC(self):
+
+        if not self.flag_C:
+            self.reg_PC += self.working_address
         return 0
+
     def BCS(self):
+        if self.flag_C:
+            self.reg_PC += self.working_address
         return 0
+
     def BEO(self):
+        if self.flag_Z:
+            self.reg_PC += self.working_address
         return 0
+
     def BIT(self):
         return 0
+
     def BMI(self):
+        if self.flag_N:
+            self.reg_PC += self.working_address
         return 0
+
     def BNE(self):
+        if not self.flag_Z:
+            self.reg_PC += self.working_address
         return 0
+
     def BPL(self):
+        if not self.flag_N:
+            self.reg_PC += self.working_address
         return 0
+
     def BRK(self):
         return 0
+
     def BVC(self):
+        if not self.flag_V:
+            self.reg_PC += self.working_address
         return 0
+
     def BVS(self):
+        if self.flag_V:
+            self.reg_PC += self.working_address
         return 0
 
     # C
@@ -325,7 +376,7 @@ class R6502:
     # D
     def DEC(self):
         new_value = self.working_data - 1
-        self.write(self.working_location, new_value)
+        self.write(self.working_address, new_value)
         self.update_flag_N(new_value)
         self.update_flag_Z(new_value)
         return 0
@@ -354,7 +405,7 @@ class R6502:
     # I
     def INC(self):
         new_value = self.working_data + 1
-        self.write(self.working_location, new_value)
+        self.write(self.working_address, new_value)
         self.update_flag_N(new_value)
         self.update_flag_Z(new_value)
         return 0
@@ -373,10 +424,18 @@ class R6502:
 
     # J
     def JMP(self):
-        self.reg_PC = self.working_data
+        self.reg_PC = self.working_address
         return 0
 
     def JSR(self):
+
+        self.reg_PC -= 1
+
+        self.push((self.reg_PC >> 8) & 0x00FF)
+        self.push(self.reg_PC & 0x00FF)
+
+        self.reg_PC = self.working_address
+
         return 0
 
     # L
@@ -478,15 +537,15 @@ class R6502:
         return 0
 
     def STA(self):
-        self.write(self.working_location, self.reg_A)
+        self.write(self.working_address, self.reg_A)
         return 0
 
     def STX(self):
-        self.write(self.working_location, self.reg_X)
+        self.write(self.working_address, self.reg_X)
         return 0
 
     def STY(self):
-        self.write(self.working_location, self.reg_Y)
+        self.write(self.working_address, self.reg_Y)
         return 0
 
     # T

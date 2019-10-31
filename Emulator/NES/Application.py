@@ -1,6 +1,8 @@
 from NES.R6502 import *
 from NES.RAM import *
+from NES.ROM import *
 from NES.Bus import *
+
 
 import numpy as np
 
@@ -12,20 +14,31 @@ def main():
     # Constructs console architecture
     bus = Bus()
     cpu = R6502()
-    ram = RAM(1024 * 4)
+    ram = RAM(1024 * 2)
+    rom = ROM("Resources/nestest.nes")
 
     cpu.connect_bus(bus)
 
     bus.connect_cpu(cpu)
     bus.connect_ram(ram)
+    bus.connect_rom(rom)
 
-    ram.memory[0] = 0x08
-    ram.memory[1] = 0x28
+    cpu.reg_PC = 0xC000
+    cpu.flag_B = True
+    cpu.flag_D = True
+    cpu.total_cycles = 7
 
-    cpu.clock()
+    while True:
+        cpu.clock()
 
-    ram.print_contents(0x0110, 16)
-    cpu.print_contents()
+        #ram.print_contents(0x050, 16)
+        #cpu.print_contents()
+
+
+
+
+
+
 
     print("Done!")
 
