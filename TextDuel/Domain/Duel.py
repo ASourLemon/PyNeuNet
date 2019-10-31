@@ -1,3 +1,5 @@
+from TextDuel.Domain.Weapons.DragonScimitar import DragonScimitar
+
 class Duel:
 
     def __init__(self, user0, user1):
@@ -19,6 +21,7 @@ class Duel:
 
     def user_won(self, user_id):
         print("User " + self.users[user_id].name + " won the match.")
+        self.give_user_reward(user_id)
 
     def attack_user(self, user_id, weapon_id):
         if user_id in self.users:
@@ -45,3 +48,8 @@ class Duel:
                 print("User " + str(user_id) + " does not own a " + str(weapon_id))
         else:
             print("User " + str(user_id) + " does not exist in this duel.")
+
+    def give_user_reward(self, user_id):
+        user = self.users[user_id]
+        user.give_weapon(DragonScimitar())
+        print("User " + user.name + " won a Dragon Scimitar.")
