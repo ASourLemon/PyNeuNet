@@ -9,7 +9,6 @@ class User:
         self.name = name
         self.weapons = {}
         self.give_weapon(DragonDagger())
-        self.give_weapon(DragonScimitar())
 
     def give_weapon(self, weapon):
         if weapon.id not in self.weapons:
