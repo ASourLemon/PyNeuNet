@@ -24,6 +24,11 @@ class Duel:
         self.give_user_reward(user_id)
 
     def attack_user(self, user_id, weapon_id):
+        self.user0_hit_points = 99
+        self.user1_hit_points = 99
+        print("A duel was created with " + user0.name + " and " + user1.name)
+
+    def use_weapon(self, user_id, weapon_id):
         if user_id in self.users:
             user = self.users[user_id]
             if weapon_id in user.weapons:
@@ -44,6 +49,10 @@ class Duel:
                             self.user_won(user_id)
 
                         break
+                s = ""
+                for hit in hits:
+                    s += " " + str(hit)
+                print(user.name + " hitted" + s + ".")
             else:
                 print("User " + str(user_id) + " does not own a " + str(weapon_id))
         else:
@@ -53,3 +62,4 @@ class Duel:
         user = self.users[user_id]
         user.give_weapon(DragonScimitar())
         print("User " + user.name + " won a Dragon Scimitar.")
+
