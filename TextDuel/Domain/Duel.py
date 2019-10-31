@@ -1,5 +1,3 @@
-
-
 class Duel:
 
     def __init__(self, user0, user1):
@@ -47,4 +45,3 @@ class Duel:
                 print("User " + str(user_id) + " does not own a " + str(weapon_id))
         else:
             print("User " + str(user_id) + " does not exist in this duel.")
-

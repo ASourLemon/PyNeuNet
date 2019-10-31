@@ -12,4 +12,3 @@ class DragonDagger:
         hit0 = rd.randint(0, self.max_hit)
         hit1 = rd.randint(0, self.max_hit)
         return [hit0, hit1]
-
