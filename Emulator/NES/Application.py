@@ -19,12 +19,12 @@ def main():
     bus.connect_cpu(cpu)
     bus.connect_ram(ram)
 
-    ram.memory[0] = 0xA2    #LDX - Loads into Register X
-    ram.memory[1] = 0x8A    #Value to load
+    ram.memory[0] = 0x08
+    ram.memory[1] = 0x28
 
     cpu.clock()
 
-    ram.print_contents(0x0050, 16)
+    ram.print_contents(0x0110, 16)
     cpu.print_contents()
 
     print("Done!")
