@@ -77,13 +77,12 @@ class R6502:
         self.current_instruction.cycles -= 1
         self.total_cycles += 1
 
-
     def single_line_print(self):
         line = "[%04X]" % self.reg_PC
         line += " %02X" % self.current_instruction.op_code
-        line += " A: " + str(self.reg_A)
-        line += " X: " + str(self.reg_X)
-        line += " Y: " + str(self.reg_Y)
+        line += " A:" + " %02X" % self.reg_A
+        line += " X:" + " %02X" % self.reg_X
+        line += " Y:" + " %02X" % self.reg_Y
         p = (int(self.flag_N) << 7) | \
             (int(self.flag_V) << 6) | \
             (int(self.flag_U) << 5) | \
@@ -92,11 +91,10 @@ class R6502:
             (int(self.flag_I) << 2) | \
             (int(self.flag_Z) << 1) | \
             (int(self.flag_C) << 0)
-        line += " P: " + str(p)
+        line += " P:" + " %02X" % p
         line += " CYC: " + str(self.total_cycles)
 
         print(line)
-
 
     def print_contents(self):
         print("A: " + " [%02X]" % self.reg_A + " " + str(self.reg_A))
@@ -114,7 +112,7 @@ class R6502:
         print("C: " + str(self.flag_C))
 
     #
-    # private
+    # Bus Helpers
     def read(self, address):
         return self.bus.read(address)
 
@@ -124,7 +122,8 @@ class R6502:
     def load_memory_location(self):
         self.working_data = self.read(self.working_address)
 
-    # Stack
+    #
+    # Stack Helpers
     def push(self, value):
         self.write(0x0100 + self.reg_S, value)
         self.reg_S -= 1
@@ -134,7 +133,8 @@ class R6502:
         value = self.read(0x0100 + self.reg_S)
         return value
 
-    # Flags
+    #
+    # Flags Helpers
     def update_flag_N(self, data):
         self.flag_N = (data & 0x80) != 0x00
 
@@ -278,80 +278,100 @@ class R6502:
     def ADC(self):
         return 0
 
+    # A & M -> A
     def AND(self):
         self.reg_A &= self.working_data
         self.update_flag_Z(self.reg_A)
         self.update_flag_N(self.reg_A)
         return 1
 
+    #
     def ASL(self):
         return 0
 
     # B
+    # Branch if C = 0
     def BCC(self):
-
         if not self.flag_C:
             self.reg_PC += self.working_address
         return 0
 
+    # Branch if C = 1
     def BCS(self):
         if self.flag_C:
             self.reg_PC += self.working_address
         return 0
 
+    # Branch if Z = 1
     def BEO(self):
         if self.flag_Z:
             self.reg_PC += self.working_address
         return 0
 
+    # A BitAND M
     def BIT(self):
+        result = self.reg_A & self.working_data
+        self.update_flag_Z(result)
+        self.update_flag_N(result)
+        self.flag_V = (result & (1 << 6)) != 0
         return 0
 
+    # Branch if N = 1
     def BMI(self):
         if self.flag_N:
             self.reg_PC += self.working_address
         return 0
 
+    # Branch if Z = 0
     def BNE(self):
         if not self.flag_Z:
             self.reg_PC += self.working_address
         return 0
 
+    # Branch if N = 0
     def BPL(self):
         if not self.flag_N:
             self.reg_PC += self.working_address
         return 0
 
+    #
     def BRK(self):
         return 0
 
+    # Branch if V = 0
     def BVC(self):
         if not self.flag_V:
             self.reg_PC += self.working_address
         return 0
 
+    # Branch if V = 1
     def BVS(self):
         if self.flag_V:
             self.reg_PC += self.working_address
         return 0
 
     # C
+    # 0 -> C
     def CLC(self):
         self.flag_C = False
         return 0
 
+    # 0 -> D
     def CLD(self):
         self.flag_D = False
         return 0
 
+    # 0 -> I
     def CLI(self):
         self.flag_I = False
         return 0
 
+    # 0 -> V
     def CLV(self):
         self.flag_V = False
         return 0
 
+    # A - M
     def CMP(self):
         result = self.reg_A - self.working_data
         self.update_flag_N(result)
@@ -359,6 +379,7 @@ class R6502:
         self.flag_C = self.reg_A >= self.working_data
         return 1
 
+    # X - M
     def CPX(self):
         result = self.reg_X - self.working_data
         self.update_flag_N(result)
@@ -366,6 +387,7 @@ class R6502:
         self.flag_C = self.reg_X >= self.working_data
         return 0
 
+    # Y - M
     def CPY(self):
         result = self.reg_Y - self.working_data
         self.update_flag_N(result)
@@ -374,6 +396,7 @@ class R6502:
         return 0
 
     # D
+    # M - 1 -> M
     def DEC(self):
         new_value = self.working_data - 1
         self.write(self.working_address, new_value)
@@ -381,12 +404,14 @@ class R6502:
         self.update_flag_Z(new_value)
         return 0
 
+    # X - 1 -> X
     def DEX(self):
         self.reg_X = self.reg_X - 1
         self.update_flag_N(self.reg_X)
         self.update_flag_Z(self.reg_X)
         return 0
 
+    # Y - 1 -> Y
     def DEY(self):
         self.reg_Y = self.reg_Y - 1
         self.update_flag_N(self.reg_Y)
@@ -394,6 +419,7 @@ class R6502:
         return 0
 
     # E
+    # A BitOR M -> A
     def EOR(self):
         self.reg_A ^= self.working_data
         self.update_flag_Z(self.reg_A)
@@ -403,6 +429,7 @@ class R6502:
         return 0
 
     # I
+    # M + 1 -> M
     def INC(self):
         new_value = self.working_data + 1
         self.write(self.working_address, new_value)
@@ -410,12 +437,14 @@ class R6502:
         self.update_flag_Z(new_value)
         return 0
 
+    # X + 1 -> X
     def INX(self):
         self.reg_X = self.reg_X + 1
         self.update_flag_N(self.reg_X)
         self.update_flag_Z(self.reg_X)
         return 0
 
+    # Y - 1 -> Y
     def INY(self):
         self.reg_Y = self.reg_Y + 1
         self.update_flag_N(self.reg_Y)
@@ -423,10 +452,12 @@ class R6502:
         return 0
 
     # J
+    # LOCATION -> PC
     def JMP(self):
         self.reg_PC = self.working_address
         return 0
 
+    # PC -> M[STK]; LOCATION -> PC
     def JSR(self):
 
         self.reg_PC -= 1
@@ -439,28 +470,33 @@ class R6502:
         return 0
 
     # L
+    # M -> A
     def LDA(self):
         self.reg_A = self.working_data
         self.update_flag_Z(self.reg_A)
         self.update_flag_N(self.reg_A)
         return 1
 
+    # M -> X
     def LDX(self):
         self.reg_X = self.working_data
         self.update_flag_Z(self.reg_X)
         self.update_flag_N(self.reg_X)
         return 1
 
+    # M -> Y
     def LDY(self):
         self.reg_Y = self.working_data
         self.update_flag_Z(self.reg_Y)
         self.update_flag_N(self.reg_Y)
         return 1
 
+    #
     def LSR(self):
         return 0
 
     # N
+    # NO OPERATION
     def NOP(self):
         if self.current_instruction.op_code in (0x1C, 0x3C, 0x5C, 0x7C, 0xDC, 0xFC):
             return 1
@@ -468,6 +504,7 @@ class R6502:
             return 0
 
     # O
+    # A BitOR M -> A
     def ORA(self):
         self.reg_A |= self.working_data
         self.update_flag_Z(self.reg_A)
@@ -475,10 +512,12 @@ class R6502:
         return 0
 
     # P
+    # A -> M[STK]; STK - 1 -> STK
     def PHA(self):
         self.push(self.reg_A)
         return 0
 
+    # P -> M[STK]; STK - 1 -> STK
     def PHP(self):
         p = (int(self.flag_N) << 7) | \
             (int(self.flag_V) << 6) | \
@@ -492,10 +531,12 @@ class R6502:
         self.push(p)
         return 0
 
+    # STK + 1 -> STK; M[STK] -> A
     def PLA(self):
         self.reg_A = self.pop()
         return 0
 
+    # STK + 1 -> STK; M[STK] -> P
     def PLP(self):
         p = self.pop()
 
@@ -511,79 +552,100 @@ class R6502:
         return 0
 
     # R
+    #
     def ROL(self):
         return 0
+
+    #
     def ROR(self):
         return 0
+
+    #
     def RTI(self):
         return 0
+
+    #
     def RTS(self):
         return 0
 
     # S
+    #
     def SBC(self):
         return 0
 
+    # 1 -> C
     def SEC(self):
         self.flag_C = True
         return 0
 
+    # 1 -> D I
     def SED(self):
         self.flag_D = True
         return 0
 
+    # 1 -> I
     def SEI(self):
         self.flag_I = True
         return 0
 
+    # A -> M
     def STA(self):
         self.write(self.working_address, self.reg_A)
         return 0
 
+    # X -> M
     def STX(self):
         self.write(self.working_address, self.reg_X)
         return 0
 
+    # Y -> M
     def STY(self):
         self.write(self.working_address, self.reg_Y)
         return 0
 
     # T
+    # A -> X
     def TAX(self):
         self.reg_X = self.reg_A
         self.update_flag_N(self.reg_X)
         self.update_flag_Z(self.reg_X)
         return 0
 
+    # A -> Y
     def TAY(self):
         self.reg_Y = self.reg_A
         self.update_flag_N(self.reg_Y)
         self.update_flag_Z(self.reg_Y)
         return 0
 
+    # S -> X
     def TSX(self):
         self.reg_X = self.reg_S
         self.update_flag_N(self.reg_X)
         self.update_flag_Z(self.reg_X)
         return 0
 
+    # X -> A
     def TXA(self):
         self.reg_A = self.reg_X
         self.update_flag_N(self.reg_A)
         self.update_flag_Z(self.reg_A)
         return 0
 
+    # X -> S
     def TXS(self):
         self.reg_S = self.reg_X
         return 0
 
+    # Y -> A
     def TYA(self):
         self.reg_A = self.reg_Y
         self.update_flag_N(self.reg_A)
         self.update_flag_Z(self.reg_A)
         return 0
 
-# X
+    # X
+    # Illegal instructions
     def XXX(self):
         return 0
 

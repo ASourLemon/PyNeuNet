@@ -24,8 +24,8 @@ def main():
     bus.connect_rom(rom)
 
     cpu.reg_PC = 0xC000
-    cpu.flag_B = True
-    cpu.flag_D = True
+    cpu.flag_I = True
+    cpu.flag_U = True
     cpu.total_cycles = 7
 
     while True:
