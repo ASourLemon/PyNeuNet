@@ -263,17 +263,21 @@ class R6502:
 
     # Absolute Indirect [Indirect]
     def ain(self):
+
         ptr_low = self.read(self.reg_PC)
         self.reg_PC += 1
         ptr_high = self.read(self.reg_PC)
         self.reg_PC += 1
+
         actual_ptr = (ptr_high << 8) | ptr_low
 
         data_low = self.read(actual_ptr)
-        data_high = self.read(actual_ptr + 1)
+        if ptr_low == 0x00FF:
+            data_high = self.read(actual_ptr & 0xFF00)
+        else:
+            data_high = self.read(actual_ptr + 1)
 
         self.working_address = (data_high << 8) | data_low
-
         return 0
 
     # Opcodes
@@ -406,8 +410,6 @@ class R6502:
 
     # A - M
     def CMP(self):
-        if self.reg_PC == 0xD940:
-            k = 1+1
         result = (self.reg_A - self.working_data)
         self.update_flag_N(result & 0x00FF)
         self.update_flag_Z(result & 0x00FF)
@@ -461,8 +463,6 @@ class R6502:
         self.update_flag_N(self.reg_A)
         return 1
 
-        return 0
-
     # I
     # M + 1 -> M
     def INC(self):
@@ -507,7 +507,6 @@ class R6502:
     # L
     # M -> A
     def LDA(self):
-
         self.reg_A = self.working_data
         self.update_flag_Z(self.reg_A)
         self.update_flag_N(self.reg_A)
@@ -688,8 +687,6 @@ class R6502:
 
     # A -> M
     def STA(self):
-        if self.reg_PC == 0xD909:
-            k = 1+1
         self.write(self.working_address, self.reg_A)
         return 0
 
@@ -746,20 +743,57 @@ class R6502:
 
     # X
     # Illegal instructions
-    def XXX(self):
+    def KILL(self):
+        return 0
+
+    def SLO(self):
+        return 0
+
+    def ANC(self):
+        return 0
+
+    def SLO(self):
         return 0
 
     # Instruction Set
-ii = ("XXX", R6502.iad, R6502.XXX, 9, 9)
+ii = ("KILL", R6502.iad, R6502.KILL, 9, 9)
 
 instruction_set_matrix = [
-    [("BRK", R6502.iad, R6502.BRK, 1, 7), ("ORA", R6502.iix, R6502.ORA, 2, 6), ii, ii, ii, ("ORA", R6502.zpa, R6502.ORA, 2, 3), ("ASL", R6502.zpa, R6502.ASL, 2, 5), ii, ("PHP", R6502.iad, R6502.PHP, 1, 3), ("ORA", R6502.imm, R6502.ORA, 2, 2), ("ASL", R6502.acc, R6502.ASL, 1, 2), ii, ii, ("ORA", R6502.abs, R6502.ORA, 3, 4), ("ASL", R6502.abs, R6502.ASL, 3, 6), ii],
-    [("BPL", R6502.rad, R6502.BPL, 2, 2), ("ORA", R6502.iiy, R6502.ORA, 2, 5), ii, ii, ii, ("ORA", R6502.zpx, R6502.ORA, 2, 4), ("ASL", R6502.zpx, R6502.ASL, 2, 6), ii, ("CLC", R6502.iad, R6502.CLC, 1, 2), ("ORA", R6502.aby, R6502.ORA, 3, 4), ii, ii, ii, ("ORA", R6502.abx, R6502.ORA, 3, 4), ("ASL", R6502.abx, R6502.ASL, 3, 7), ii],
+    # 0
+    [("BRK", R6502.iad, R6502.BRK, 1, 7),
+     ("ORA", R6502.iix, R6502.ORA, 2, 6), ii,
+     ("SLO", R6502.iix, R6502.SLO, 2, 8),
+     ("NOP", R6502.zpa, R6502.NOP, 2, 3),
+     ("ORA", R6502.zpa, R6502.ORA, 2, 3),
+     ("ASL", R6502.zpa, R6502.ASL, 2, 5),
+     ("SLO", R6502.zpa, R6502.SLO, 2, 5),
+     ("PHP", R6502.iad, R6502.PHP, 1, 3),
+     ("ORA", R6502.imm, R6502.ORA, 2, 2),
+     ("ASL", R6502.acc, R6502.ASL, 1, 2),
+     ("ANC", R6502.zpa, R6502.ANC, 2, 5),
+     ("NOP", R6502.abs, R6502.NOP, 2, 4),
+     ("ORA", R6502.abs, R6502.ORA, 3, 4),
+     ("ASL", R6502.abs, R6502.ASL, 3, 6),
+     ("SLO", R6502.abs, R6502.SLO, 2, 6)],
+    # 1
+    [("BPL", R6502.rad, R6502.BPL, 2, 2),
+     ("ORA", R6502.iiy, R6502.ORA, 2, 5), ii,
+     ("SLO", R6502.iiy, R6502.SLO, 2, 5),
+     ("NOP", R6502.iix, R6502.NOP, 2, 5),
+     ("ORA", R6502.zpx, R6502.ORA, 2, 4),
+     ("ASL", R6502.zpx, R6502.ASL, 2, 6),
+     ("SLO", R6502.iix, R6502.ORA, 2, 5),
+     ("CLC", R6502.iad, R6502.CLC, 1, 2),
+     ("ORA", R6502.aby, R6502.ORA, 3, 4), ii, ii, ii,
+     ("ORA", R6502.abx, R6502.ORA, 3, 4),
+     ("ASL", R6502.abx, R6502.ASL, 3, 7),
+     ii],
+
     [("JSR", R6502.abs, R6502.JSR, 3, 6), ("AND", R6502.iix, R6502.AND, 2, 6), ii, ii, ("BIT", R6502.zpa, R6502.BIT, 2, 3), ("AND", R6502.zpa, R6502.AND, 2, 3), ("ROL", R6502.zpa, R6502.ROL, 2, 5), ii, ("PLP", R6502.iad, R6502.PLP, 1, 4), ("AND", R6502.imm, R6502.AND, 2, 2), ("ROL", R6502.acc, R6502.ROL, 1, 2), ii, ("BIT", R6502.abs, R6502.BIT, 3, 4), ("AND", R6502.abs, R6502.AND, 3, 4), ("ROL", R6502.abs, R6502.ROL, 3, 6), ii],
     [("BMI", R6502.rad, R6502.BMI, 2, 2), ("AND", R6502.iiy, R6502.AND, 2, 5), ii, ii, ii, ("AND", R6502.zpx, R6502.AND, 2, 4), ("ROL", R6502.zpx, R6502.ROL, 2, 6), ii, ("SEC", R6502.iad, R6502.SEC, 1, 2), ("AND", R6502.aby, R6502.AND, 3, 4), ii, ii, ii, ("AND", R6502.abx, R6502.AND, 3, 4), ("ASL", R6502.abx, R6502.ROL, 3, 7), ii],
     [("RTI", R6502.iad, R6502.RTI, 1, 6), ("EOR", R6502.iix, R6502.EOR, 2, 6), ii, ii, ii, ("EOR", R6502.zpa, R6502.EOR, 2, 3), ("LSR", R6502.zpa, R6502.LSR, 2, 5), ii, ("PHA", R6502.iad, R6502.PHA, 1, 3), ("EOR", R6502.imm, R6502.EOR, 2, 2), ("LSR", R6502.acc, R6502.LSR, 1, 2), ii,  ("JMP", R6502.abs, R6502.JMP, 3, 3), ("EOR", R6502.abs, R6502.EOR, 3, 3), ("LSR", R6502.abs, R6502.LSR, 3, 6), ii],
     [("BVC", R6502.rad, R6502.BVC, 2, 2), ("EOR", R6502.iiy, R6502.EOR, 2, 5), ii, ii, ii, ("EOR", R6502.zpx, R6502.EOR, 2, 4), ("LSR", R6502.zpx, R6502.LSR, 2, 6), ii, ("CLI", R6502.iad, R6502.CLI, 1, 2), ("EOR", R6502.aby, R6502.EOR, 3, 4), ii, ii, ii, ("EOR", R6502.abx, R6502.EOR, 3, 4), ("LSR", R6502.abx, R6502.LSR, 3, 7), ii],
-    [("RTS", R6502.iad, R6502.RTS, 1, 6), ("ADC", R6502.iix, R6502.ADC, 2, 6), ii, ii, ii, ("ADC", R6502.zpa, R6502.ADC, 2, 3), ("ROR", R6502.zpa, R6502.ROR, 2, 5), ii, ("PLA", R6502.iad, R6502.PLA, 1, 4), ("ADC", R6502.imm, R6502.ADC, 2, 2), ("ROR", R6502.acc, R6502.ROR, 1, 2), ii, ("JMP", R6502.iad, R6502.JMP, 3, 5), ("ADC", R6502.abs, R6502.ADC, 3, 4), ("ROR", R6502.abs, R6502.ROR, 3, 6), ii],
+    [("RTS", R6502.iad, R6502.RTS, 1, 6), ("ADC", R6502.iix, R6502.ADC, 2, 6), ii, ii, ii, ("ADC", R6502.zpa, R6502.ADC, 2, 3), ("ROR", R6502.zpa, R6502.ROR, 2, 5), ii, ("PLA", R6502.iad, R6502.PLA, 1, 4), ("ADC", R6502.imm, R6502.ADC, 2, 2), ("ROR", R6502.acc, R6502.ROR, 1, 2), ii, ("JMP", R6502.ain, R6502.JMP, 3, 5), ("ADC", R6502.abs, R6502.ADC, 3, 4), ("ROR", R6502.abs, R6502.ROR, 3, 6), ii],
     [("BVS", R6502.rad, R6502.BVS, 2, 2), ("ADC", R6502.iiy, R6502.BVS, 2, 5), ii, ii, ii, ("ADC", R6502.zpx, R6502.ADC, 2, 4), ("ROR", R6502.zpx, R6502.ROR, 2, 6), ii, ("SEI", R6502.iad, R6502.SEI, 1, 2), ("ADC", R6502.aby, R6502.ADC, 3, 4), ii, ii, ii, ("ADC", R6502.abx, R6502.ADC, 3, 4), ("ROR", R6502.abx, R6502.ROR, 3, 7), ii],
     [ii, ("STA", R6502.iix, R6502.STA, 2, 6), ii, ii, ("STY", R6502.zpa, R6502.STY, 2, 3), ("STA", R6502.zpa, R6502.STA, 2, 3), ("STX", R6502.zpa, R6502.STX, 2, 3), ii, ("DEY", R6502.iad, R6502.DEY, 1, 2), ii, ("TXA", R6502.iad, R6502.TXA, 1, 2), ii, ("STY", R6502.abs, R6502.STY, 3, 4), ("STA", R6502.abs, R6502.STA, 3, 4), ("STX", R6502.abs, R6502.STX, 3, 4), ii],
     [("BCC", R6502.rad, R6502.BCC, 2, 2), ("STA", R6502.iiy, R6502.STA, 2, 6), ii, ii, ("STY", R6502.zpx, R6502.STY, 2, 4), ("STA", R6502.zpx, R6502.STA, 2, 4), ("STX", R6502.zpy, R6502.STX, 2, 4), ii, ("TYA", R6502.iad, R6502.TYA, 1, 2), ("STA", R6502.aby, R6502.STA, 3, 5), ("TXS", R6502.iad, R6502.TXS, 1, 2), ii, ii, ("STA", R6502.abx, R6502.STA, 3, 5), ii, ii],

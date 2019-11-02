@@ -17,6 +17,7 @@ I did it for the lulz.
 ### Emulator
 - [6502 CPU Datasheet](https://www.mdawson.net/vic20chrome/cpu/mos_6500_mpu_preliminary_may_1976.pdf)
 - [6502 CPU Datasheet](http://archive.6502.org/datasheets/rockwell_r650x_r651x.pdf)
+- [6502 Undocumented Op Codes](http://www.oxyron.de/html/opcodes02.html)
 - [OneLoneCoder Example Project](https://github.com/OneLoneCoder/olcNES)
 - [Testing](wiki.nesdev.com/w/index.php/Emulator_tests)
 
