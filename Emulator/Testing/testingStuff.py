@@ -1,5 +1,6 @@
 import sys
 import math
+import numpy as np
 
 
 
@@ -130,6 +131,12 @@ class CPU:
         return False
 
 def main():
+
+
+    v = np.uint8(0x00)
+    print(v)
+    print((v - 1) & 0x00FF)
+
 
     program = input()
 

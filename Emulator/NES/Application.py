@@ -24,12 +24,13 @@ def main():
     bus.connect_rom(rom)
 
     cpu.reg_PC = 0xC000
+    cpu.reg_S = 0xFD
     cpu.flag_I = True
     cpu.flag_U = True
-    cpu.total_cycles = 7
 
     while True:
-        cpu.clock()
+        if not cpu.clock(8000):
+            break
 
         #ram.print_contents(0x050, 16)
         #cpu.print_contents()

@@ -61,21 +61,24 @@ class R6502:
     def execute_instruction(self, instruction):
         return instruction.execution_function(self)
 
-    def clock(self):
+    def clock(self, cycles = 1):
 
-        if self.current_instruction is None or self.current_instruction.cycles == 0:
-            op_code = self.read(self.reg_PC)
-            self.current_instruction = R6502_Instruction(op_code)
-            self.single_line_print()
-            self.reg_PC += 1
+        if self.total_cycles > cycles:
+            return False
 
-            load_extra_cycles = self.load_instruction(self.current_instruction)
-            execute_extra_cycles = self.execute_instruction(self.current_instruction)
-            self.current_instruction.cycles += load_extra_cycles + execute_extra_cycles
+        #if self.current_instruction is None or self.current_instruction.cycles == 0:
+        op_code = self.read(self.reg_PC)
+        self.current_instruction = R6502_Instruction(op_code)
+        self.single_line_print()
+        self.reg_PC += 1
 
+        load_extra_cycles = self.load_instruction(self.current_instruction)
+        execute_extra_cycles = self.execute_instruction(self.current_instruction)
+        self.current_instruction.cycles += load_extra_cycles + execute_extra_cycles
 
         self.current_instruction.cycles -= 1
         self.total_cycles += 1
+        return True
 
     def single_line_print(self):
         line = "[%04X]" % self.reg_PC
@@ -92,6 +95,7 @@ class R6502:
             (int(self.flag_Z) << 1) | \
             (int(self.flag_C) << 0)
         line += " P:" + " %02X" % p
+        line += " SP:" + " %02X" % self.reg_S
         line += " CYC: " + str(self.total_cycles)
 
         print(line)
@@ -126,10 +130,10 @@ class R6502:
     # Stack Helpers
     def push(self, value):
         self.write(0x0100 + self.reg_S, value)
-        self.reg_S -= 1
+        self.reg_S = (self.reg_S - 1) & 0x00FF
 
     def pop(self):
-        self.reg_S += 1
+        self.reg_S = (self.reg_S + 1) & 0x00FF
         value = self.read(0x0100 + self.reg_S)
         return value
 
@@ -247,7 +251,7 @@ class R6502:
         self.reg_PC += 1
 
         low_bits = self.read(zp & 0x00FF)
-        high_bits = self.read(zp & 0x00FF)
+        high_bits = self.read((zp + 1) & 0x00FF)
 
         self.working_address = (high_bits << 8) | low_bits
         self.working_address += self.reg_Y
@@ -275,8 +279,22 @@ class R6502:
     # Opcodes
 
     # A
+    # A + M + C -> A
     def ADC(self):
-        return 0
+
+        result = self.reg_A + self.working_data + int(self.flag_C)
+
+        result_converted = result & 0x00FF
+
+        self.flag_C = (result > 0xFF)
+        self.update_flag_Z(result_converted)
+
+        self.flag_V = ((~(self.reg_A ^ self.working_data) & (self.reg_A ^ result)) & 0x0080) != 0
+
+        self.update_flag_N(result_converted)
+
+        self.reg_A = result_converted
+        return 1
 
     # A & M -> A
     def AND(self):
@@ -287,6 +305,19 @@ class R6502:
 
     #
     def ASL(self):
+
+        result = self.working_data << 1
+
+        self.flag_C = (result & 0xFF00) > 0
+        result &= 0x00FF
+        self.update_flag_N(result)
+        self.update_flag_Z(result)
+
+        if self.current_instruction.execution_function == self.iad:
+            self.reg_A = result
+        else:
+            self.write(self.working_address, result)
+
         return 0
 
     # B
@@ -312,8 +343,8 @@ class R6502:
     def BIT(self):
         result = self.reg_A & self.working_data
         self.update_flag_Z(result)
-        self.update_flag_N(result)
-        self.flag_V = (result & (1 << 6)) != 0
+        self.flag_N = (self.working_data & (1 << 7)) != 0
+        self.flag_V = (self.working_data & (1 << 6)) != 0
         return 0
 
     # Branch if N = 1
@@ -336,6 +367,8 @@ class R6502:
 
     #
     def BRK(self):
+        self.flag_B = True
+        self.flag_U = True
         return 0
 
     # Branch if V = 0
@@ -373,9 +406,11 @@ class R6502:
 
     # A - M
     def CMP(self):
-        result = self.reg_A - self.working_data
-        self.update_flag_N(result)
-        self.update_flag_Z(result)
+        if self.reg_PC == 0xD940:
+            k = 1+1
+        result = (self.reg_A - self.working_data)
+        self.update_flag_N(result & 0x00FF)
+        self.update_flag_Z(result & 0x00FF)
         self.flag_C = self.reg_A >= self.working_data
         return 1
 
@@ -398,7 +433,7 @@ class R6502:
     # D
     # M - 1 -> M
     def DEC(self):
-        new_value = self.working_data - 1
+        new_value = (self.working_data - 1) & 0x00FF
         self.write(self.working_address, new_value)
         self.update_flag_N(new_value)
         self.update_flag_Z(new_value)
@@ -406,14 +441,14 @@ class R6502:
 
     # X - 1 -> X
     def DEX(self):
-        self.reg_X = self.reg_X - 1
+        self.reg_X = (self.reg_X - 1) & 0x00FF
         self.update_flag_N(self.reg_X)
         self.update_flag_Z(self.reg_X)
         return 0
 
     # Y - 1 -> Y
     def DEY(self):
-        self.reg_Y = self.reg_Y - 1
+        self.reg_Y = (self.reg_Y - 1) & 0x00FF
         self.update_flag_N(self.reg_Y)
         self.update_flag_Z(self.reg_Y)
         return 0
@@ -431,7 +466,7 @@ class R6502:
     # I
     # M + 1 -> M
     def INC(self):
-        new_value = self.working_data + 1
+        new_value = (self.working_data + 1) & 0x00FF
         self.write(self.working_address, new_value)
         self.update_flag_N(new_value)
         self.update_flag_Z(new_value)
@@ -439,14 +474,14 @@ class R6502:
 
     # X + 1 -> X
     def INX(self):
-        self.reg_X = self.reg_X + 1
+        self.reg_X = (self.reg_X + 1) & 0x00FF
         self.update_flag_N(self.reg_X)
         self.update_flag_Z(self.reg_X)
         return 0
 
     # Y - 1 -> Y
     def INY(self):
-        self.reg_Y = self.reg_Y + 1
+        self.reg_Y = (self.reg_Y + 1) & 0x00FF
         self.update_flag_N(self.reg_Y)
         self.update_flag_Z(self.reg_Y)
         return 0
@@ -472,6 +507,7 @@ class R6502:
     # L
     # M -> A
     def LDA(self):
+
         self.reg_A = self.working_data
         self.update_flag_Z(self.reg_A)
         self.update_flag_N(self.reg_A)
@@ -491,8 +527,22 @@ class R6502:
         self.update_flag_N(self.reg_Y)
         return 1
 
-    #
+    # M/A >> 1 -> M/A
     def LSR(self):
+
+        self.flag_C = (self.working_data & 0x0001) != 0
+
+        result = self.working_data >> 1
+        result &= 0x00FF
+
+        self.update_flag_N(result)
+        self.update_flag_Z(result)
+
+        if self.current_instruction.execution_function == self.iad:
+            self.reg_A = result
+        else:
+            self.write(self.working_address, result)
+
         return 0
 
     # N
@@ -521,8 +571,8 @@ class R6502:
     def PHP(self):
         p = (int(self.flag_N) << 7) | \
             (int(self.flag_V) << 6) | \
-            (int(self.flag_U) << 5) | \
-            (int(self.flag_B) << 4) | \
+            (int(True) << 5) | \
+            (int(True) << 4) | \
             (int(self.flag_D) << 3) | \
             (int(self.flag_I) << 2) | \
             (int(self.flag_Z) << 1) | \
@@ -534,6 +584,8 @@ class R6502:
     # STK + 1 -> STK; M[STK] -> A
     def PLA(self):
         self.reg_A = self.pop()
+        self.update_flag_N(self.reg_A)
+        self.update_flag_Z(self.reg_A)
         return 0
 
     # STK + 1 -> STK; M[STK] -> P
@@ -544,8 +596,8 @@ class R6502:
         self.flag_Z = (p & 0x02) != 0
         self.flag_I = (p & 0x04) != 0
         self.flag_D = (p & 0x08) != 0
-        self.flag_B = (p & 0x10) != 0
-        self.flag_U = (p & 0x20) != 0
+        #self.flag_B = (p & 0x10) != 0
+        #self.flag_U = (p & 0x20) != 0
         self.flag_V = (p & 0x40) != 0
         self.flag_N = (p & 0x80) != 0
 
@@ -554,23 +606,69 @@ class R6502:
     # R
     #
     def ROL(self):
+
+        result = self.working_data << 1 | int(self.flag_C)
+        result &= 0x00FF
+
+        self.flag_C = (result & 0xFF00) != 0
+        self.update_flag_N(result)
+        self.update_flag_Z(result)
+
+        if self.current_instruction.execution_function == self.iad:
+            self.reg_A = result
+        else:
+            self.write(self.working_address, result)
+
         return 0
 
     #
     def ROR(self):
+
+        result = int(self.flag_C) << 7 | self.working_data >> 1
+        result &= 0x00FF
+
+        self.flag_C = (result & 0x01) != 0
+        self.update_flag_N(result)
+        self.update_flag_Z(result)
+
+        if self.current_instruction.execution_function == self.iad:
+            self.reg_A = result
+        else:
+            self.write(self.working_address, result)
+
         return 0
 
     #
     def RTI(self):
         return 0
 
-    #
+    # M[STK] -> PC; PC + 1 -> PC
     def RTS(self):
+
+        pc_low = self.pop()
+        pc_high = self.pop()
+
+        self.reg_PC = (pc_high << 8) | pc_low
+        self.reg_PC += 1
         return 0
 
     # S
-    #
+    # A - M - C -> A
     def SBC(self):
+
+        neg_working_data = self.working_data ^ 0x00FF
+
+        result = self.reg_A + neg_working_data + int(self.flag_C)
+        result_converted = result & 0x00FF
+
+        self.flag_C = (result & 0xFF00) != 0
+        self.update_flag_Z(result_converted)
+
+        self.flag_V = (((result ^ self.reg_A) & (result ^ neg_working_data)) & 0x0080) != 0
+
+        self.update_flag_N(result_converted)
+
+        self.reg_A = result_converted
         return 0
 
     # 1 -> C
@@ -590,6 +688,8 @@ class R6502:
 
     # A -> M
     def STA(self):
+        if self.reg_PC == 0xD909:
+            k = 1+1
         self.write(self.working_address, self.reg_A)
         return 0
 
@@ -657,16 +757,16 @@ instruction_set_matrix = [
     [("BPL", R6502.rad, R6502.BPL, 2, 2), ("ORA", R6502.iiy, R6502.ORA, 2, 5), ii, ii, ii, ("ORA", R6502.zpx, R6502.ORA, 2, 4), ("ASL", R6502.zpx, R6502.ASL, 2, 6), ii, ("CLC", R6502.iad, R6502.CLC, 1, 2), ("ORA", R6502.aby, R6502.ORA, 3, 4), ii, ii, ii, ("ORA", R6502.abx, R6502.ORA, 3, 4), ("ASL", R6502.abx, R6502.ASL, 3, 7), ii],
     [("JSR", R6502.abs, R6502.JSR, 3, 6), ("AND", R6502.iix, R6502.AND, 2, 6), ii, ii, ("BIT", R6502.zpa, R6502.BIT, 2, 3), ("AND", R6502.zpa, R6502.AND, 2, 3), ("ROL", R6502.zpa, R6502.ROL, 2, 5), ii, ("PLP", R6502.iad, R6502.PLP, 1, 4), ("AND", R6502.imm, R6502.AND, 2, 2), ("ROL", R6502.acc, R6502.ROL, 1, 2), ii, ("BIT", R6502.abs, R6502.BIT, 3, 4), ("AND", R6502.abs, R6502.AND, 3, 4), ("ROL", R6502.abs, R6502.ROL, 3, 6), ii],
     [("BMI", R6502.rad, R6502.BMI, 2, 2), ("AND", R6502.iiy, R6502.AND, 2, 5), ii, ii, ii, ("AND", R6502.zpx, R6502.AND, 2, 4), ("ROL", R6502.zpx, R6502.ROL, 2, 6), ii, ("SEC", R6502.iad, R6502.SEC, 1, 2), ("AND", R6502.aby, R6502.AND, 3, 4), ii, ii, ii, ("AND", R6502.abx, R6502.AND, 3, 4), ("ASL", R6502.abx, R6502.ROL, 3, 7), ii],
-    [("RTI", R6502.iad, R6502.RTI, 1, 6), ("EOR", R6502.iix, R6502.EOR, 2, 6), ii, ii, ii, ("EOR", R6502.zpa, R6502.EOR, 2, 3), ("LSR", R6502.zpa, R6502.LSR, 2, 5), ii, ("PHA", R6502.iad, R6502.PHA, 1, 3), ("EOR", R6502.imm, R6502.EOR, 2, 2), ("LSR", R6502.acc, R6502.LSR, 1, 2), ii,  ("JMP", R6502.abs, R6502.JMP, 3, 3), ("EOR", R6502.abs, R6502.EOR, 3, 3), ("LSR", R6502.abs, R6502.JMP, 3, 6), ii],
+    [("RTI", R6502.iad, R6502.RTI, 1, 6), ("EOR", R6502.iix, R6502.EOR, 2, 6), ii, ii, ii, ("EOR", R6502.zpa, R6502.EOR, 2, 3), ("LSR", R6502.zpa, R6502.LSR, 2, 5), ii, ("PHA", R6502.iad, R6502.PHA, 1, 3), ("EOR", R6502.imm, R6502.EOR, 2, 2), ("LSR", R6502.acc, R6502.LSR, 1, 2), ii,  ("JMP", R6502.abs, R6502.JMP, 3, 3), ("EOR", R6502.abs, R6502.EOR, 3, 3), ("LSR", R6502.abs, R6502.LSR, 3, 6), ii],
     [("BVC", R6502.rad, R6502.BVC, 2, 2), ("EOR", R6502.iiy, R6502.EOR, 2, 5), ii, ii, ii, ("EOR", R6502.zpx, R6502.EOR, 2, 4), ("LSR", R6502.zpx, R6502.LSR, 2, 6), ii, ("CLI", R6502.iad, R6502.CLI, 1, 2), ("EOR", R6502.aby, R6502.EOR, 3, 4), ii, ii, ii, ("EOR", R6502.abx, R6502.EOR, 3, 4), ("LSR", R6502.abx, R6502.LSR, 3, 7), ii],
     [("RTS", R6502.iad, R6502.RTS, 1, 6), ("ADC", R6502.iix, R6502.ADC, 2, 6), ii, ii, ii, ("ADC", R6502.zpa, R6502.ADC, 2, 3), ("ROR", R6502.zpa, R6502.ROR, 2, 5), ii, ("PLA", R6502.iad, R6502.PLA, 1, 4), ("ADC", R6502.imm, R6502.ADC, 2, 2), ("ROR", R6502.acc, R6502.ROR, 1, 2), ii, ("JMP", R6502.iad, R6502.JMP, 3, 5), ("ADC", R6502.abs, R6502.ADC, 3, 4), ("ROR", R6502.abs, R6502.ROR, 3, 6), ii],
     [("BVS", R6502.rad, R6502.BVS, 2, 2), ("ADC", R6502.iiy, R6502.BVS, 2, 5), ii, ii, ii, ("ADC", R6502.zpx, R6502.ADC, 2, 4), ("ROR", R6502.zpx, R6502.ROR, 2, 6), ii, ("SEI", R6502.iad, R6502.SEI, 1, 2), ("ADC", R6502.aby, R6502.ADC, 3, 4), ii, ii, ii, ("ADC", R6502.abx, R6502.ADC, 3, 4), ("ROR", R6502.abx, R6502.ROR, 3, 7), ii],
     [ii, ("STA", R6502.iix, R6502.STA, 2, 6), ii, ii, ("STY", R6502.zpa, R6502.STY, 2, 3), ("STA", R6502.zpa, R6502.STA, 2, 3), ("STX", R6502.zpa, R6502.STX, 2, 3), ii, ("DEY", R6502.iad, R6502.DEY, 1, 2), ii, ("TXA", R6502.iad, R6502.TXA, 1, 2), ii, ("STY", R6502.abs, R6502.STY, 3, 4), ("STA", R6502.abs, R6502.STA, 3, 4), ("STX", R6502.abs, R6502.STX, 3, 4), ii],
-    [("BCC", R6502.rad, R6502.BCC, 2, 2), ("STA", R6502.iiy, R6502.STA, 2, 6), ii, ii, ("STY", R6502.zpx, R6502.STY, 2, 4), ("STA", R6502.zpx, R6502.STA, 2, 4), ("STX", R6502.zpy, R6502.STX, 2, 4), ii, ("TYA", R6502.iad, R6502.BCC, 1, 2), ("STA", R6502.aby, R6502.BCC, 3, 5), ("TXS", R6502.iad, R6502.BCC, 1, 2), ii, ii, ("STA", R6502.abx, R6502.STA, 3, 5), ii, ii],
+    [("BCC", R6502.rad, R6502.BCC, 2, 2), ("STA", R6502.iiy, R6502.STA, 2, 6), ii, ii, ("STY", R6502.zpx, R6502.STY, 2, 4), ("STA", R6502.zpx, R6502.STA, 2, 4), ("STX", R6502.zpy, R6502.STX, 2, 4), ii, ("TYA", R6502.iad, R6502.TYA, 1, 2), ("STA", R6502.aby, R6502.STA, 3, 5), ("TXS", R6502.iad, R6502.TXS, 1, 2), ii, ii, ("STA", R6502.abx, R6502.STA, 3, 5), ii, ii],
     [("LDY", R6502.imm, R6502.LDY, 2, 2), ("LDA", R6502.iix, R6502.LDA, 2, 6), ("LDX", R6502.imm, R6502.LDX, 2, 2), ii, ("LDY", R6502.zpa, R6502.LDY, 2, 3), ("LDA", R6502.zpa, R6502.LDA, 2, 3), ("LDX", R6502.zpa, R6502.LDX, 2, 3), ii, ("TAY", R6502.iad, R6502.TAY, 1, 2), ("LDA", R6502.imm, R6502.LDA, 2, 2), ("TAX", R6502.iad, R6502.TAX, 1, 2), ii, ("LDY", R6502.abs, R6502.LDY, 3, 4), ("LDA", R6502.abs, R6502.LDA, 3, 4), ("LDX", R6502.abs, R6502.LDX, 3, 4), ii],
-    [("BCS", R6502.rad, R6502.BCS, 2, 2), ("LDA", R6502.iiy, R6502.LDA, 2, 5), ii, ii, ("LDY", R6502.zpx, R6502.LDY, 2, 4), ("LDA", R6502.zpx, R6502.LDA, 2, 4), ("LDX", R6502.zpy, R6502.LDX, 2, 4), ii, ("CLV", R6502.iad, R6502.CLV, 1, 2), ("LDA", R6502.aby, R6502.BCS, 3, 4), ("TSX", R6502.iad, R6502.BCS, 1, 2), ii, ("LDY", R6502.abx, R6502.LDY, 3, 4), ("LDA", R6502.abx, R6502.LDA, 3, 4), ("LDX", R6502.aby, R6502.LDX, 3, 4), ii],
+    [("BCS", R6502.rad, R6502.BCS, 2, 2), ("LDA", R6502.iiy, R6502.LDA, 2, 5), ii, ii, ("LDY", R6502.zpx, R6502.LDY, 2, 4), ("LDA", R6502.zpx, R6502.LDA, 2, 4), ("LDX", R6502.zpy, R6502.LDX, 2, 4), ii, ("CLV", R6502.iad, R6502.CLV, 1, 2), ("LDA", R6502.aby, R6502.LDA, 3, 4), ("TSX", R6502.iad, R6502.TSX, 1, 2), ii, ("LDY", R6502.abx, R6502.LDY, 3, 4), ("LDA", R6502.abx, R6502.LDA, 3, 4), ("LDX", R6502.aby, R6502.LDX, 3, 4), ii],
     [("CPY", R6502.imm, R6502.CPY, 2, 2), ("CMP", R6502.iix, R6502.CMP, 2, 6), ii, ii, ("CPY", R6502.zpa, R6502.CPY, 2, 3), ("CMP", R6502.zpa, R6502.CMP, 2, 3), ("DEC", R6502.zpa, R6502.DEC, 2, 5), ii, ("INY", R6502.iad, R6502.INY, 1, 2), ("CMP", R6502.imm, R6502.CMP, 2, 2), ("DEX", R6502.iad, R6502.DEX, 1, 2), ii, ("CPY", R6502.abs, R6502.CPY, 3, 4), ("CMP", R6502.abs, R6502.CMP, 3, 4), ("DEC", R6502.abs, R6502.DEC, 3, 6), ii],
-    [("BNE", R6502.rad, R6502.BNE, 2, 2), ("CMP", R6502.iiy, R6502.CMP, 2, 5), ii, ii, ii, ("CMP", R6502.zpx, R6502.CMP, 2, 4), ("DEC", R6502.zpx, R6502.DEC, 2, 6), ii, ("CLD", R6502.iad, R6502.BNE, 1, 2), ("CMP", R6502.aby, R6502.BNE, 3, 4), ii, ii, ii, ("CMP", R6502.abx, R6502.CMP, 3, 4), ("DEC", R6502.abx, R6502.DEC, 3, 7), ii],
+    [("BNE", R6502.rad, R6502.BNE, 2, 2), ("CMP", R6502.iiy, R6502.CMP, 2, 5), ii, ii, ii, ("CMP", R6502.zpx, R6502.CMP, 2, 4), ("DEC", R6502.zpx, R6502.DEC, 2, 6), ii, ("CLD", R6502.iad, R6502.CLD, 1, 2), ("CMP", R6502.aby, R6502.BNE, 3, 4), ii, ii, ii, ("CMP", R6502.abx, R6502.CMP, 3, 4), ("DEC", R6502.abx, R6502.DEC, 3, 7), ii],
     [("CPX", R6502.imm, R6502.CPX, 2, 2), ("SBC", R6502.iix, R6502.SBC, 2, 6), ii, ii, ("CPX", R6502.zpa, R6502.CPX, 2, 3), ("SBC", R6502.zpa, R6502.CPX, 2, 3), ("INC", R6502.zpa, R6502.CPX, 2, 5), ii, ("INX", R6502.iad, R6502.INX, 1, 2), ("SBC", R6502.imm, R6502.SBC, 2, 2), ("NOP", R6502.iad, R6502.NOP, 1, 2), ii, ("CPX", R6502.abs, R6502.CPX, 3, 4), ("SBC", R6502.abs, R6502.SBC, 3, 4), ("INC", R6502.abs, R6502.INC, 3, 6), ii],
     [("BEO", R6502.rad, R6502.BEO, 2, 2), ("SBC", R6502.iiy, R6502.SBC, 2, 5), ii, ii, ii, ("SBC", R6502.zpx, R6502.SBC, 2, 4), ("INC", R6502.zpx, R6502.INC, 2, 6), ii, ("SED", R6502.iad, R6502.SED, 1, 2), ("SBC", R6502.aby, R6502.SBC, 3, 4), ii, ii, ii, ("SBC", R6502.abx, R6502.SBC, 3, 4), ("INC", R6502.abx, R6502.INC, 3, 7), ii]
 ]
