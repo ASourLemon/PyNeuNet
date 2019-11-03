@@ -5,6 +5,19 @@ from NES.Bus import *
 import numpy as np
 
 
+
+class NES:
+
+    def __init__(self):
+        self.bus = Bus()
+        self.cpu = R6502()
+        self.ram = RAM(1024 * 2)
+
+        self.cpu.connect_bus(self.bus)
+        self.bus.connect_cpu(self.cpu)
+        self.bus.connect_ram(self.ram)
+
+# nestest
 log_data_entries = []
 def load_nestest_log(location):
     with open(location, "r") as file:
@@ -29,7 +42,6 @@ def load_nestest_log(location):
 
             log_data_entries.insert(line_entry, (PC, OC, A, X, Y, P, SP, CYC))
             line_entry += 1
-
 def compare_to_log(instruction, cpu_state):
     log_data = log_data_entries[instruction]
     correct = \
@@ -42,37 +54,28 @@ def compare_to_log(instruction, cpu_state):
         (log_data[6] == cpu_state[6]) and \
         (log_data[7] == cpu_state[7])
     return correct
+def run_nestest(console):
 
-def main():
+    console.cpu.reg_PC = 0xC000
+    console.cpu.reg_S = 0xFD
+    console.cpu.total_cycles = 7
+    console.cpu.flag_I = True
+    console.cpu.flag_U = True
+    console.cpu.debug = True
 
-    np.seterr(over="ignore")
-
-    # Constructs console architecture
-    bus = Bus()
-    cpu = R6502()
-    ram = RAM(1024 * 2)
     rom = ROM("Resources/nestest.nes")
-
-    cpu.connect_bus(bus)
-
-    bus.connect_cpu(cpu)
-    bus.connect_ram(ram)
-    bus.connect_rom(rom)
-
-    cpu.reg_PC = 0xC000
-    cpu.reg_S = 0xFD
-    cpu.total_cycles = 7
-    cpu.flag_I = True
-    cpu.flag_U = True
+    console.bus.connect_rom(rom)
 
     load_nestest_log("Resources/nestest.log")
 
     instructions_completed = 1
-    fails = 1
     for _ in range(30000):
 
-        cpu.clock()
-        cpu_state = cpu.get_internal_state()
+        console.cpu.clock()
+        cpu_state = console.cpu.get_internal_state()
+
+        if instructions_completed == len(log_data_entries):
+            break
 
         if cpu_state != ():
             if not compare_to_log(instructions_completed, cpu_state):
@@ -88,14 +91,15 @@ def main():
                 print("Error was caught on the last instruction. Expected:")
                 print(line)
                 break
-
             instructions_completed += 1
 
-        if instructions_completed > len(log_data_entries):
-            break
 
-        #ram.print_contents(0x050, 16)
-        #cpu.print_contents()
+def main():
+
+    np.seterr(over="ignore")
+
+    console = NES()
+    run_nestest(console)
 
     print("Done!")
 
