@@ -33,8 +33,6 @@ class ROM:
 
         with open(location, "rb") as f:
             self.data = []
-            byte_index = 0
-
             self.header = Header(f)
 
             if self.header.mapper1 & 0x04:

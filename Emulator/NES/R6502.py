@@ -43,12 +43,12 @@ class R6502:
         self.absolute_address = np.uint16(0x0000)           # Stores the address to read operand
         self.relative_address = np.uint16(0x0000)
         self.working_data = np.uint8(0)                             # Stores the operand to use
-        self.crossed_page = False
         self.is_imp = False
 
         self.bus = None
         self.current_instruction = None
 
+        self.debug = False
 
 
     # public
@@ -56,7 +56,6 @@ class R6502:
         self.bus = bus
 
     def load_instruction(self, instruction):
-        self.crossed_page = False
         self.is_imp = False
         cycles = instruction.addressing_function(self)
         self.working_data = self.read(self.absolute_address)
@@ -65,11 +64,7 @@ class R6502:
     def execute_instruction(self, instruction):
         return instruction.execution_function(self)
 
-    def clock(self, cycles = 1):
-
-        if self.total_cycles > cycles:
-            return False
-
+    def clock(self):
         if self.current_instruction is None or self.current_instruction.cycles == 0:
             op_code = self.read(self.reg_PC)
             self.current_instruction = R6502_Instruction(op_code)
@@ -82,27 +77,27 @@ class R6502:
 
         self.current_instruction.cycles -= 1
         self.total_cycles += 1
-        return True
 
+    # Debug
     def single_line_print(self):
-        line = "[%04X]" % self.reg_PC
-        line += " %02X" % self.current_instruction.op_code
-        line += "  A:" + "%02X" % self.reg_A
-        line += "  X:" + "%02X" % self.reg_X
-        line += "  Y:" + "%02X" % self.reg_Y
-        p = (int(self.flag_N) << 7) | \
-            (int(self.flag_V) << 6) | \
-            (int(self.flag_U) << 5) | \
-            (int(self.flag_B) << 4) | \
-            (int(self.flag_D) << 3) | \
-            (int(self.flag_I) << 2) | \
-            (int(self.flag_Z) << 1) | \
-            (int(self.flag_C) << 0)
-        line += "  P:" + "%02X" % p
-        line += "  SP:" + "%02X" % self.reg_S
-        line += "  CYC:" + str(self.total_cycles)
-
-        print(line)
+        if self.debug:
+            line = "[%04X]" % self.reg_PC
+            line += " %02X" % self.current_instruction.op_code
+            line += "  A:" + "%02X" % self.reg_A
+            line += "  X:" + "%02X" % self.reg_X
+            line += "  Y:" + "%02X" % self.reg_Y
+            p = (int(self.flag_N) << 7) | \
+                (int(self.flag_V) << 6) | \
+                (int(self.flag_U) << 5) | \
+                (int(self.flag_B) << 4) | \
+                (int(self.flag_D) << 3) | \
+                (int(self.flag_I) << 2) | \
+                (int(self.flag_Z) << 1) | \
+                (int(self.flag_C) << 0)
+            line += "  P:" + "%02X" % p
+            line += "  SP:" + "%02X" % self.reg_S
+            line += "  CYC:" + str(self.total_cycles)
+            print(line)
 
     def print_contents(self):
         print("A:" + " [%02X]" % self.reg_A + " " + str(self.reg_A))
@@ -119,6 +114,20 @@ class R6502:
         print("Z: " + str(self.flag_Z))
         print("C: " + str(self.flag_C))
 
+    def get_internal_state(self):
+        if self.current_instruction.cycles != 0:
+            return ()
+        p = (int(self.flag_N) << 7) | \
+            (int(self.flag_V) << 6) | \
+            (int(self.flag_U) << 5) | \
+            (int(self.flag_B) << 4) | \
+            (int(self.flag_D) << 3) | \
+            (int(self.flag_I) << 2) | \
+            (int(self.flag_Z) << 1) | \
+            (int(self.flag_C) << 0)
+        i = R6502_Instruction(self.read(self.reg_PC))
+        return (self.reg_PC, i.op_code, self.reg_A, self.reg_X, self.reg_Y, p, self.reg_S, self.total_cycles, i.mnemonic)
+
     #
     # Bus Helpers
     def read(self, address):
@@ -127,7 +136,7 @@ class R6502:
     def write(self, address, data):
         self.bus.write(address, data)
 
-    def check_page_boundary(self, new_address):
+    def check_page_boundary(self, base_address, indexed_address):
         if self.current_instruction.op_code in (0x10, 0x11, 0x19, 0x1C, 0x1D,
                                                 0x30, 0x31, 0x39, 0x3C, 0x3D,
                                                 0x50, 0x51, 0x59, 0x5C, 0x5D,
@@ -136,7 +145,8 @@ class R6502:
                                                 0xB0, 0xB1, 0xB3, 0xB9, 0xBB, 0xBC, 0xBD, 0xBE, 0xBF,
                                                 0xD0, 0xD1, 0xD9, 0xDC, 0xDD,
                                                 0xF0, 0xF1, 0xF9, 0xFC, 0xFD):
-            self.crossed_page = (self.reg_PC & 0xFF00) == (new_address & 0xFF00)
+            return int((base_address & 0xFF00) != (indexed_address & 0xFF00))
+        return 0
 
 
     #
@@ -170,7 +180,6 @@ class R6502:
 
     # Immediate Address [IMM]
     def imm(self):
-        self.check_page_boundary(self.reg_PC)
         self.absolute_address = self.reg_PC
         self.reg_PC += 1
         return 0
@@ -183,7 +192,6 @@ class R6502:
         self.reg_PC += 1
 
         new_address = (high_bits << 8) | low_bits
-        self.check_page_boundary(new_address)
         self.absolute_address = new_address
 
         return 0
@@ -195,11 +203,11 @@ class R6502:
         high_bits = self.read(self.reg_PC)
         self.reg_PC += 1
 
-        new_address = ((high_bits << 8) | low_bits) + self.reg_X
-        self.check_page_boundary(new_address)
-        self.absolute_address = new_address
+        base_address = ((high_bits << 8) | low_bits)
+        indexed_address = (base_address + self.reg_X)
+        self.absolute_address = indexed_address
 
-        return 0
+        return self.check_page_boundary(base_address, indexed_address)
 
     # X Index Absolute Addressing [ABS, Y]
     def aby(self):
@@ -208,16 +216,15 @@ class R6502:
         high_bits = self.read(self.reg_PC)
         self.reg_PC += 1
 
-        new_address = ((high_bits << 8) | low_bits) + self.reg_Y
-        self.check_page_boundary(new_address)
-        self.absolute_address = new_address
+        base_address = ((high_bits << 8) | low_bits) & 0xFFFF
+        indexed_address = (base_address + self.reg_Y) & 0xFFFF
+        self.absolute_address = indexed_address
 
-        return 0
+        return self.check_page_boundary(base_address, indexed_address)
 
     # Zero Page Addressing [ZP]
     def zpa(self):
         new_address = self.read(self.reg_PC) & 0x00FF
-        self.check_page_boundary(new_address)
         self.absolute_address = new_address
         self.reg_PC += 1
         return 0
@@ -225,7 +232,6 @@ class R6502:
     # X Indexed Zero Page Addressing [ZP, X]
     def zpx(self):
         new_address = (self.read(self.reg_PC) + self.reg_X) & 0x00FF
-        self.check_page_boundary(new_address)
         self.absolute_address = new_address
         self.reg_PC += 1
         return 0
@@ -233,7 +239,6 @@ class R6502:
     # Y Indexed Zero Page Addressing [ZP, Y]
     def zpy(self):
         new_address = (self.read(self.reg_PC) + self.reg_Y) & 0x00FF
-        self.check_page_boundary(new_address)
         self.absolute_address = new_address
         self.reg_PC += 1
         return 0
@@ -246,39 +251,34 @@ class R6502:
         if self.relative_address & 0x80:
             self.relative_address |= 0xFF00
 
-        new_address = (self.reg_PC + self.relative_address) & 0xFFFF
-        self.check_page_boundary(new_address)
-        self.absolute_address = new_address
+        self.absolute_address = (self.reg_PC + self.relative_address) & 0xFFFF
         return 0
 
     # Indexed Indirect Addressing [(IND, X)]
     def izx(self):
-
         zp = self.read(self.reg_PC)
         self.reg_PC += 1
 
-        low_bits = self.read(zp + self.reg_X) & 0x00FF
-        high_bits = self.read(zp + self.reg_X + 1) & 0x00FF
+        low_bits = self.read((zp + self.reg_X) & 0x00FF)
+        high_bits = self.read((zp + self.reg_X + 1) & 0x00FF)
 
         new_address = (high_bits << 8) | low_bits
-        self.check_page_boundary(new_address)
         self.absolute_address = new_address
         return 0
 
     # Indirect Indexed Addressing [(IND), Y]
     def izy(self):
-
         zp = self.read(self.reg_PC)
         self.reg_PC += 1
 
         low_bits = self.read(zp & 0x00FF)
         high_bits = self.read((zp + 1) & 0x00FF)
 
-        new_address = ((high_bits << 8) | low_bits) + self.reg_Y
-        self.check_page_boundary(new_address)
-        self.absolute_address = new_address
+        base_address = ((high_bits << 8) | low_bits) & 0xFFFF
+        indexed_address = (base_address + self.reg_Y) & 0xFFFF
 
-        return 0
+        self.absolute_address = indexed_address
+        return self.check_page_boundary(base_address, indexed_address)
 
     # Absolute Indirect [Indirect]
     def ind(self):
@@ -296,8 +296,7 @@ class R6502:
         else:
             data_high = self.read(actual_ptr + 1)
 
-        new_address = ((data_high << 8) | data_low)
-        self.check_page_boundary(new_address)
+        new_address = ((data_high << 8) | data_low) & 0xFFFF
         self.absolute_address = new_address
         return 0
 
@@ -319,52 +318,51 @@ class R6502:
         self.update_flag_N(result_converted)
 
         self.reg_A = result_converted
-        return int(self.crossed_page)
+        return 0
 
     # A & M -> A
     def AND(self):
         self.reg_A &= self.working_data
         self.update_flag_Z(self.reg_A)
         self.update_flag_N(self.reg_A)
-        return int(self.crossed_page)
+        return 0
 
     #
     def ASL(self):
-
-        result = self.working_data << 1
-
-        self.flag_C = (result & 0xFF00) > 0
-        result &= 0x00FF
-        self.update_flag_N(result)
-        self.update_flag_Z(result)
-
+        self.working_data <<= 1
+        self.flag_C = (self.working_data & 0xFF00) > 0
+        self.working_data &= 0x00FF
+        self.update_flag_N(self.working_data)
+        self.update_flag_Z(self.working_data)
         if self.is_imp:
-            self.reg_A = result
+            self.reg_A = self.working_data
         else:
-            self.write(self.absolute_address, result)
-
+            self.write(self.absolute_address, self.working_data)
         return 0
 
     # B
     # Branch if C = 0
     def BCC(self):
         if not self.flag_C:
+            extra_cycles = self.check_page_boundary(self.reg_PC, self.absolute_address)
             self.reg_PC = self.absolute_address
-            return 1
+            return extra_cycles + 1
         return 0
 
     # Branch if C = 1
     def BCS(self):
         if self.flag_C:
+            extra_cycles = self.check_page_boundary(self.reg_PC, self.absolute_address)
             self.reg_PC = self.absolute_address
-            return 1
+            return extra_cycles + 1
         return 0
 
     # Branch if Z = 1
-    def BEO(self):
+    def BEQ(self):
         if self.flag_Z:
+            extra_cycles = self.check_page_boundary(self.reg_PC, self.absolute_address)
             self.reg_PC = self.absolute_address
-            return 1
+            return extra_cycles + 1
         return 0
 
     # A BitAND M
@@ -378,22 +376,25 @@ class R6502:
     # Branch if N = 1
     def BMI(self):
         if self.flag_N:
+            extra_cycles = self.check_page_boundary(self.reg_PC, self.absolute_address)
             self.reg_PC = self.absolute_address
-            return 1
+            return extra_cycles + 1
         return 0
 
     # Branch if Z = 0
     def BNE(self):
         if not self.flag_Z:
+            extra_cycles = self.check_page_boundary(self.reg_PC, self.absolute_address)
             self.reg_PC = self.absolute_address
-            return 1
+            return extra_cycles + 1
         return 0
 
     # Branch if N = 0
     def BPL(self):
         if not self.flag_N:
+            extra_cycles = self.check_page_boundary(self.reg_PC, self.absolute_address)
             self.reg_PC = self.absolute_address
-            return 1
+            return extra_cycles + 1
         return 0
 
     #
@@ -405,15 +406,17 @@ class R6502:
     # Branch if V = 0
     def BVC(self):
         if not self.flag_V:
+            extra_cycles = self.check_page_boundary(self.reg_PC, self.absolute_address)
             self.reg_PC = self.absolute_address
-            return 1
+            return extra_cycles + 1
         return 0
 
     # Branch if V = 1
     def BVS(self):
         if self.flag_V:
+            extra_cycles = self.check_page_boundary(self.reg_PC, self.absolute_address)
             self.reg_PC = self.absolute_address
-            return 1
+            return extra_cycles + 1
         return 0
 
     # C
@@ -443,7 +446,7 @@ class R6502:
         self.update_flag_N(result & 0x00FF)
         self.update_flag_Z(result & 0x00FF)
         self.flag_C = self.reg_A >= self.working_data
-        return int(self.crossed_page)
+        return 0
 
     # X - M
     def CPX(self):
@@ -464,10 +467,10 @@ class R6502:
     # D
     # M - 1 -> M
     def DEC(self):
-        new_value = (self.working_data - 1) & 0x00FF
-        self.write(self.absolute_address, new_value)
-        self.update_flag_N(new_value)
-        self.update_flag_Z(new_value)
+        self.working_data = (self.working_data - 1) & 0x00FF
+        self.write(self.absolute_address, self.working_data)
+        self.update_flag_N(self.working_data)
+        self.update_flag_Z(self.working_data)
         return 0
 
     # X - 1 -> X
@@ -490,15 +493,15 @@ class R6502:
         self.reg_A ^= self.working_data
         self.update_flag_Z(self.reg_A)
         self.update_flag_N(self.reg_A)
-        return int(self.crossed_page)
+        return 0
 
     # I
     # M + 1 -> M
     def INC(self):
-        new_value = (self.working_data + 1) & 0x00FF
-        self.write(self.absolute_address, new_value)
-        self.update_flag_N(new_value)
-        self.update_flag_Z(new_value)
+        self.working_data = (self.working_data + 1) & 0x00FF
+        self.write(self.absolute_address, self.working_data)
+        self.update_flag_N(self.working_data)
+        self.update_flag_Z(self.working_data)
         return 0
 
     # X + 1 -> X
@@ -539,46 +542,39 @@ class R6502:
         self.reg_A = self.working_data
         self.update_flag_Z(self.reg_A)
         self.update_flag_N(self.reg_A)
-        return int(self.crossed_page)
+        return 0
 
     # M -> X
     def LDX(self):
         self.reg_X = self.working_data
         self.update_flag_Z(self.reg_X)
         self.update_flag_N(self.reg_X)
-        return int(self.crossed_page)
+        return 0
 
     # M -> Y
     def LDY(self):
         self.reg_Y = self.working_data
         self.update_flag_Z(self.reg_Y)
         self.update_flag_N(self.reg_Y)
-        return int(self.crossed_page)
+        return 0
 
     # M/A >> 1 -> M/A
     def LSR(self):
         self.flag_C = (self.working_data & 0x0001) != 0
-
-        result = self.working_data >> 1
-        result &= 0x00FF
-
-        self.update_flag_N(result)
-        self.update_flag_Z(result)
-
+        self.working_data >>= 1
+        self.working_data &= 0x00FF
+        self.update_flag_N(self.working_data)
+        self.update_flag_Z(self.working_data)
         if self.is_imp:
-            self.reg_A = result
+            self.reg_A = self.working_data
         else:
-            self.write(self.absolute_address, result)
-        self.working_data = result
+            self.write(self.absolute_address, self.working_data)
         return 0
 
     # N
     # NO OPERATION
     def NOP(self):
-        if self.current_instruction.op_code in (0x1C, 0x3C, 0x5C, 0x7C, 0xDC, 0xFC):
-            return 1
-        else:
-            return 0
+        return 0
 
     # O
     # A BitOR M -> A
@@ -633,31 +629,24 @@ class R6502:
     # R
     #
     def ROL(self):
-
-        result = self.working_data << 1 | int(self.flag_C)
-        result &= 0x00FF
-
-        self.flag_C = (result & 0xFF00) != 0
-        self.update_flag_N(result)
-        self.update_flag_Z(result)
-
+        self.working_data = self.working_data << 1 | int(self.flag_C)
+        self.flag_C = (self.working_data & 0xFF00) != 0
+        self.working_data &= 0x00FF
+        self.update_flag_N(self.working_data)
+        self.update_flag_Z(self.working_data)
         if self.is_imp:
-            self.reg_A = result
+            self.reg_A = self.working_data
         else:
-            self.write(self.absolute_address, result)
-
+            self.write(self.absolute_address, self.working_data)
         return 0
 
     #
     def ROR(self):
 
-        if self.total_cycles == 2381:
-            r = 1 + 1
-
         result = int(self.flag_C) << 7 | self.working_data >> 1
-        result &= 0x00FF
 
         self.flag_C = (self.working_data & 0x01) != 0
+        result &= 0x00FF
         self.update_flag_N(result)
         self.update_flag_Z(result)
 
@@ -716,7 +705,7 @@ class R6502:
         self.update_flag_N(result_converted)
 
         self.reg_A = result_converted
-        return int(self.crossed_page)
+        return 0
 
     # 1 -> C
     def SEC(self):
@@ -806,17 +795,25 @@ class R6502:
         return 0
     # D
     def DCP(self):
+        self.DEC()
+        self.CMP()
         return 0
     # I
     def ISC(self):
+        self.INC()
+        self.SBC()
         return 0
     # L
     def LAS(self):
         return 0
     def LAX(self):
+        self.LDA()
+        self.LDX()
         return 0
     # R
     def RLA(self):
+        self.ROL()
+        self.AND()
         return 0
     def RRA(self):
         self.ROR()
@@ -824,6 +821,8 @@ class R6502:
         return 0
     # S
     def SAX(self):
+        self.working_data = self.reg_A & self.reg_X
+        self.write(self.absolute_address, self.working_data)
         return 0
     def SHY(self):
         return 0
@@ -836,6 +835,8 @@ class R6502:
 
 
     def SLO(self):
+        self.ASL()
+        self.ORA()
         return 0
     # T
     def TAS(self):
@@ -1078,7 +1079,7 @@ instruction_set_matrix = [
      ("NOP", R6502.zpx, R6502.NOP, 4),
      ("CMP", R6502.zpx, R6502.CMP, 4),
      ("DEC", R6502.zpx, R6502.DEC, 6),
-     ("DCP", R6502.zpx, R6502.DCP, 4),
+     ("DCP", R6502.zpx, R6502.DCP, 6),
      ("CLD", R6502.imp, R6502.CLD, 2),
      ("CMP", R6502.aby, R6502.CMP, 4),
      ("NOP", R6502.imp, R6502.NOP, 2),
@@ -1093,8 +1094,8 @@ instruction_set_matrix = [
      ("NOP", R6502.imm, R6502.NOP, 2),
      ("ISC", R6502.izx, R6502.ISC, 8),
      ("CPX", R6502.zpa, R6502.CPX, 3),
-     ("SBC", R6502.zpa, R6502.CPX, 3),
-     ("INC", R6502.zpa, R6502.CPX, 5),
+     ("SBC", R6502.zpa, R6502.SBC, 3),
+     ("INC", R6502.zpa, R6502.INC, 5),
      ("ISC", R6502.zpa, R6502.ISC, 5),
      ("INX", R6502.imp, R6502.INX, 2),
      ("SBC", R6502.imm, R6502.SBC, 2),
@@ -1105,7 +1106,7 @@ instruction_set_matrix = [
      ("INC", R6502.abs, R6502.INC, 6),
      ("ISC", R6502.abs, R6502.ISC, 6)],
     # F
-    [("BEO", R6502.rel, R6502.BEO, 2),
+    [("BEQ", R6502.rel, R6502.BEQ, 2),
      ("SBC", R6502.izy, R6502.SBC, 5),
      kill_instruction,
      ("ISC", R6502.izy, R6502.ISC, 8),
