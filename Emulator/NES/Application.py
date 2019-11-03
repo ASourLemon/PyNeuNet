@@ -57,10 +57,8 @@ def compare_to_log(instruction, cpu_state):
 def run_nestest(console):
 
     console.cpu.reg_PC = 0xC000
-    console.cpu.reg_S = 0xFD
     console.cpu.total_cycles = 7
-    console.cpu.flag_I = True
-    console.cpu.flag_U = True
+    console.cpu.flag_B = False
     console.cpu.debug = True
 
     rom = ROM("Resources/nestest.nes")
@@ -93,6 +91,20 @@ def run_nestest(console):
                 break
             instructions_completed += 1
 
+def run_instr_test_v5(console):
+
+    console.cpu.reg_PC = 0xC000
+    console.cpu.reg_S = 0xFD
+    console.cpu.debug = True
+
+    rom = ROM("Resources/official_only.nes")
+    console.bus.connect_rom(rom)
+
+    instructions_completed = 1
+    #for _ in range(30000):
+    #    console.cpu.clock()
+
+    console.ram.print_contents(6000, 6032, 16)
 
 def main():
 

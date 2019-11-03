@@ -29,14 +29,14 @@ class R6502:
         self.reg_Y = np.uint8(0)              # Y Register
         self.reg_X = np.uint8(0)              # X Register
         self.reg_PC = np.uint16(0)            # Program Counter
-        self.reg_S = np.uint8(0)              # Stack Pointer
+        self.reg_S = np.uint8(0xFD)              # Stack Pointer
 
         self.flag_N = False         # Negative
         self.flag_V = False         # Overflow
-        self.flag_U = False         # Unused
-        self.flag_B = False         # Break
+        self.flag_U = True          # Unused
+        self.flag_B = True          # Break
         self.flag_D = False         # Decimal / Unused
-        self.flag_I = False         # Disable Interrupts
+        self.flag_I = True          # Disable Interrupts
         self.flag_Z = False         # Zero
         self.flag_C = False         # Carry
 

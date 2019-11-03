@@ -20,8 +20,8 @@ class RAM:
         if 0x0000 <= address < self.size:
             self.memory[address] = data
 
-    def print_contents(self, upper_bound, step):
-        for p in range(0, upper_bound, step):
+    def print_contents(self, lower_bound, upper_bound, step):
+        for p in range(lower_bound, upper_bound, step):
             s = "$%04X:" % p + " "
             for i in range(step + 1):
                 s += "%02X" % self.memory[p + i] + " "
