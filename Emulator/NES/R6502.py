@@ -18,6 +18,7 @@ class R6502_Instruction:
         self.execution_function = instruction[2]
         self.cycles = instruction[3]
 
+
 class R6502:
 
     # Extra required for Emulation
@@ -29,7 +30,7 @@ class R6502:
         self.reg_Y = np.uint8(0)              # Y Register
         self.reg_X = np.uint8(0)              # X Register
         self.reg_PC = np.uint16(0)            # Program Counter
-        self.reg_S = np.uint8(0xFD)              # Stack Pointer
+        self.reg_S = np.uint8(0xFD)           # Stack Pointer
 
         self.flag_N = False         # Negative
         self.flag_V = False         # Overflow
@@ -42,16 +43,16 @@ class R6502:
 
         self.absolute_address = np.uint16(0x0000)           # Stores the address to read operand
         self.relative_address = np.uint16(0x0000)
-        self.working_data = np.uint8(0)                             # Stores the operand to use
+        self.working_data = np.uint8(0)                     # Stores the operand to use
         self.is_imp = False
 
         self.bus = None
         self.current_instruction = None
+        self.total_cycles = 0
 
         self.debug = False
 
-
-    # public
+    # Public
     def connect_bus(self, bus):
         self.bus = bus
 
@@ -77,6 +78,10 @@ class R6502:
 
         self.current_instruction.cycles -= 1
         self.total_cycles += 1
+
+    def reset(self):
+        self.total_cycles = 0
+        return 0
 
     # Debug
     def single_line_print(self):
@@ -131,10 +136,10 @@ class R6502:
     #
     # Bus Helpers
     def read(self, address):
-        return np.uint8(self.bus.read(address))
+        return np.uint8(self.bus.cpu_read(address))
 
     def write(self, address, data):
-        self.bus.write(address, data)
+        self.bus.cpu_write(address, data)
 
     def check_page_boundary(self, base_address, indexed_address):
         if self.current_instruction.op_code in (0x10, 0x11, 0x19, 0x1C, 0x1D,
@@ -147,7 +152,6 @@ class R6502:
                                                 0xF0, 0xF1, 0xF9, 0xFC, 0xFD):
             return int((base_address & 0xFF00) != (indexed_address & 0xFF00))
         return 0
-
 
     #
     # Stack Helpers
@@ -167,7 +171,6 @@ class R6502:
 
     def update_flag_Z(self, data):
         self.flag_Z = data == 0x00
-
 
     #
     # Addressing Modes

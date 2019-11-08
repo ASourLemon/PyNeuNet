@@ -6,19 +6,32 @@ class Bus:
         self.cpu = None
         self.ram = None
         self.rom = None
+        self.ppu = None
 
-    # Reads data from the Bus
-    def read(self, address):
+    # CPU Reads data from the Bus
+    def cpu_read(self, address):
         if 0x0000 <= address <= 0x1FFF:
             return self.ram.read(address & 0x1FFF)
         elif 0x4020 <= address <= 0xFFFF:
-            return self.rom.read(address)
+            return self.rom.cpu_read(address)
         return 0
 
-    # Writes data to the Bus
-    def write(self, address, data):
+    # CPU Writes data to the Bus
+    def cpu_write(self, address, data):
         if 0x0000 <= address <= 0x1FFF:
             self.ram.write(address & 0x1FFF, data)
+
+    # PPU Reads data from the Bus
+    def ppu_read(self, address):
+        if 0x0000 <= address <= 0x1FFF:
+            return self.rom.ppu_read(address)
+        elif 0x2000 <= address <= 0x2FFF:
+            # NameTable
+            return 0
+        elif 0x3F00 <= address <= 0x3FFF:
+            # Palettes
+            return 0
+        return 0
 
     def connect_cpu(self, cpu):
         self.cpu = cpu
@@ -28,3 +41,6 @@ class Bus:
 
     def connect_rom(self, rom):
         self.rom = rom
+
+    def connect_ppu(self, ppu):
+        self.ppu = ppu

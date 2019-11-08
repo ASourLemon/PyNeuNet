@@ -1,5 +1,6 @@
 import pygame.gfxdraw
 import random
+import numpy as np
 
 
 
@@ -9,33 +10,29 @@ def main():
     h = 500
 
     pygame.init()
-    pygame.display.gl_set_attribute(pygame.GL_ACCELERATED_VISUAL, 1)
-    screen = pygame.display.set_mode((w,h))
-    screen.fill((0, 0, 0))
-    s = pygame.Surface(screen.get_size(), pygame.OPENGL, 32)
+    display = pygame.display.set_mode((350, 350))
+    x = np.arange(0, w)
+    y = np.arange(0, h)
+    X, Y = np.meshgrid(x, y)
+    Z = X + Y
 
-    frame = 0
-    try:
-        while 1:
-            event = pygame.event.wait()
+
+
+    running = True
+
+    while running:
+        for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                break
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE or event.unicode == 'q':
-                    break
+                running = False
 
-            for y in range(h):
-                for x in range(w):
-                    r = random.randint(0, 1)
-                    pygame.gfxdraw.pixel(s, x, y, (r * 255, r * 255, r * 255))
+        for y in range(h):
+            for x in range(w):
+                r = random.randint(0, 1)
+                Z[y][x] = r * 255
 
-            frame += 1
-            screen.blit(s, (0, 0))
-            pygame.display.update()
-    finally:
-        pygame.quit()
-
-    print("Frames: " + str(frame))
-    print("Done!")
+        surf = pygame.surfarray.make_surface(Z)
+        display.blit(surf, (0, 0))
+        pygame.display.update()
+    pygame.quit()
 
 main()

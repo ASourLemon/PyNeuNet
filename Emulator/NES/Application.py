@@ -1,9 +1,9 @@
 from NES.R6502 import *
 from NES.RAM import *
-from NES.ROM import *
+from NES.Cartridge import *
 from NES.Bus import *
+from NES.V2C02 import *
 import numpy as np
-
 
 
 class NES:
@@ -12,10 +12,26 @@ class NES:
         self.bus = Bus()
         self.cpu = R6502()
         self.ram = RAM(1024 * 2)
+        self.ppu = V2C02()
 
         self.cpu.connect_bus(self.bus)
         self.bus.connect_cpu(self.cpu)
         self.bus.connect_ram(self.ram)
+        self.bus.connect_ppu(self.ppu)
+
+        self.total_cycles = 0
+
+    def clock(self):
+        if (self.total_cycles % 3) == 0:
+            self.cpu.clock()
+        self.ppu.clock()
+
+    def reset(self):
+        self.cpu.reset()
+        self.total_cycles = 0
+
+
+
 
 # nestest
 log_data_entries = []
@@ -61,7 +77,7 @@ def run_nestest(console):
     console.cpu.flag_B = False
     console.cpu.debug = True
 
-    rom = ROM("Resources/nestest.nes")
+    rom = Cartridge("Resources/nestest.nes")
     console.bus.connect_rom(rom)
 
     load_nestest_log("Resources/nestest.log")
@@ -69,7 +85,7 @@ def run_nestest(console):
     instructions_completed = 1
     for _ in range(30000):
 
-        console.cpu.clock()
+        console.clock()
         cpu_state = console.cpu.get_internal_state()
 
         if instructions_completed == len(log_data_entries):
@@ -97,7 +113,7 @@ def run_instr_test_v5(console):
     console.cpu.reg_S = 0xFD
     console.cpu.debug = True
 
-    rom = ROM("Resources/official_only.nes")
+    rom = Cartridge("Resources/official_only.nes")
     console.bus.connect_rom(rom)
 
     instructions_completed = 1
