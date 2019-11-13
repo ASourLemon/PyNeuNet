@@ -136,10 +136,10 @@ class R6502:
     #
     # Bus Helpers
     def read(self, address):
-        return np.uint8(self.bus.cpu_read(address))
+        return np.uint8(self.bus.cpu_bus_read(address))
 
     def write(self, address, data):
-        self.bus.cpu_write(address, data)
+        self.bus.cpu_bus_write(address, data)
 
     def check_page_boundary(self, base_address, indexed_address):
         if self.current_instruction.op_code in (0x10, 0x11, 0x19, 0x1C, 0x1D,

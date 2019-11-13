@@ -1,38 +1,36 @@
-import pygame.gfxdraw
+import pygame
 import random
-import numpy as np
 
+width = 250
+height = 250
 
+pygame.init()
+screen = pygame.display.set_mode((width, height))
+clock = pygame.time.Clock()
+running = True
 
-def main():
+x = 0
+y = 0
+frame = 0
 
-    w = 500
-    h = 500
+while running:
 
-    pygame.init()
-    display = pygame.display.set_mode((350, 350))
-    x = np.arange(0, w)
-    y = np.arange(0, h)
-    X, Y = np.meshgrid(x, y)
-    Z = X + Y
+    for event in pygame.event.get():
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            running = False
 
+    r = random.randint(0, 1)
+    screen.set_at((x, y), (r * 255, r * 255, r * 255))
 
+    x += 1
+    if x > width:
+        x = 0
+        y += 1
+        if y > height:
+            y = 0
+            frame += 1
+            screen.convert()
+            pygame.display.update()
+            pygame.display.set_caption("Frame: " + str(frame))
 
-    running = True
-
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-
-        for y in range(h):
-            for x in range(w):
-                r = random.randint(0, 1)
-                Z[y][x] = r * 255
-
-        surf = pygame.surfarray.make_surface(Z)
-        display.blit(surf, (0, 0))
-        pygame.display.update()
-    pygame.quit()
-
-main()
+pygame.quit()

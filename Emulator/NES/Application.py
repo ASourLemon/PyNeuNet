@@ -4,15 +4,17 @@ from NES.Cartridge import *
 from NES.Bus import *
 from NES.V2C02 import *
 import numpy as np
+import pygame as pg
 
 
 class NES:
 
     def __init__(self):
+        self.game = pg
         self.bus = Bus()
         self.cpu = R6502()
         self.ram = RAM(1024 * 2)
-        self.ppu = V2C02()
+        self.ppu = V2C02(self.game)
 
         self.cpu.connect_bus(self.bus)
         self.bus.connect_cpu(self.cpu)
@@ -22,9 +24,18 @@ class NES:
         self.total_cycles = 0
 
     def clock(self):
+
+        for event in self.game.event.get():
+            if event.type == self.game.KEYDOWN and event.key == self.game.K_ESCAPE:
+                return False
+
+        self.ppu.clock()
         if (self.total_cycles % 3) == 0:
             self.cpu.clock()
-        self.ppu.clock()
+
+        self.total_cycles += 1
+
+        return True
 
     def reset(self):
         self.cpu.reset()
@@ -82,17 +93,17 @@ def run_nestest(console):
 
     load_nestest_log("Resources/nestest.log")
 
-    instructions_completed = 1
-    for _ in range(30000):
+    console_cycles = 3
+    while True:
 
         console.clock()
         cpu_state = console.cpu.get_internal_state()
 
-        if instructions_completed == len(log_data_entries):
+        if (console_cycles / 3) == len(log_data_entries):
             break
 
         if cpu_state != ():
-            if not compare_to_log(instructions_completed, cpu_state):
+            if not compare_to_log(int(console_cycles / 3), cpu_state):
                 line = "[%04X]" % cpu_state[0]
                 #line += " " + cpu_state[8]
                 line += " %02X" % cpu_state[1]
@@ -105,7 +116,7 @@ def run_nestest(console):
                 print("Error was caught on the last instruction. Expected:")
                 print(line)
                 break
-            instructions_completed += 1
+            console_cycles += 1
 
 def run_instr_test_v5(console):
 
@@ -122,12 +133,33 @@ def run_instr_test_v5(console):
 
     console.ram.print_contents(6000, 6032, 16)
 
+def run_pputest(console):
+    console.cpu.reg_PC = 0xC004
+    console.cpu.total_cycles = 7
+    console.cpu.flag_B = False
+    console.cpu.debug = False
+
+    rom = Cartridge("Resources/nestest.nes")
+    console.bus.connect_rom(rom)
+
+    load_nestest_log("Resources/nestest.log")
+
+    while True:
+        if not console.clock():
+            break
+        cpu_state = console.cpu.get_internal_state()
+        if cpu_state != ():
+            print(cpu_state)
+
+
+
+
 def main():
 
     np.seterr(over="ignore")
 
     console = NES()
-    run_nestest(console)
+    run_pputest(console)
 
     print("Done!")
 
