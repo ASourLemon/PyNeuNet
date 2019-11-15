@@ -40,7 +40,9 @@ class V2C02:
         self.reg_OAMDMA = np.uint8(0)
 
         self.ppu_address_latch = False
+        self.ppu_data_delay = 0
         self.total_cycles = 0
+        self.nmi = False
 
 
 
@@ -60,19 +62,25 @@ class V2C02:
         self.game = game_engine
         self.game.init()
 
-        self.screen = self.game.display.set_mode((self.scan_width_limit, self.scan_height_limit))
-        self.screen.fill((0, 0, 0))
+        #self.screen = self.game.display.set_mode((self.scan_width_limit, self.scan_height_limit))
+        #self.screen.fill((0, 0, 0))
 
         self.start_time = time.time()
 
         self.debug = False
 
+    def connect_bus(self, bus):
+        self.bus = bus
 
     def clock(self):
 
+        self.reg_PPUSTATUS |= (int(self.render_y >= self.screen_height_limit) << 7)
+        if self.render_y == self.screen_height_limit and self.render_x == 0:
+            self.nmi = True
+
         if self.render_x < self.screen_width_limit and 0 < self.render_y < self.screen_height_limit:
             r = random.randint(0, 1)
-            self.screen.set_at((self.render_x, self.render_y), (r * 255, r * 255, r * 255))
+            #self.screen.set_at((self.render_x, self.render_y), (r * 255, r * 255, r * 255))
 
         self.render_x += 1
         if self.render_x == self.scan_width_limit:
@@ -80,7 +88,7 @@ class V2C02:
             self.render_y += 1
             if self.render_y == self.scan_height_limit:
 
-                self.game.display.update()
+                #self.game.display.update()
                 self.frame_completed = True
                 self.total_frames += 1
 
@@ -88,16 +96,16 @@ class V2C02:
 
                 self.game.display.set_caption("FPS: " + str(self.total_frames / (time.time() - self.start_time)))
 
-
         self.total_cycles += 1
 
         if self.debug:
             print("PPU: " + str(self.total_cycles) + " cycles.")
 
-
     def cpu_write(self, address, data):
+
         if address == 0x0000:
             self.reg_PPUCTRL = data
+
         elif address == 0x0001:
             self.reg_PPUMASK = data
 
@@ -105,11 +113,12 @@ class V2C02:
             self.reg_OAMADDR = data
         elif address == 0x0004:
             self.reg_OAMDATA = data
+
         elif address == 0x0005:
             self.reg_PPUSCROLL = data
 
         elif address == 0x0006:
-            if self.ppu_address_latch:
+            if not self.ppu_address_latch:
                 self.reg_PPUADDR = (self.reg_PPUADDR & 0x00FF) | (data << 8)
                 self.ppu_address_latch = True
             else:
@@ -118,8 +127,9 @@ class V2C02:
 
         elif address == 0x0007:
             self.write(self.reg_PPUADDR, data)
+            self.reg_PPUADDR += 1
 
-    def cpu_read(self, address):
+    def cpu_read(self, address, read):
         if address == 0x0000:
             return 0
         elif address == 0x0001:
@@ -127,7 +137,8 @@ class V2C02:
         elif address == 0x0002:
             self.reg_PPUSTATUS |= PPUSTATUS_V
             data = self.reg_PPUSTATUS & 0xE0
-            #self.reg_PPUSTATUS &= ~PPUSTATUS_V
+
+            self.reg_PPUSTATUS &= ~PPUSTATUS_V
             self.ppu_address_latch = False
             return data
         elif address == 0x0003:
@@ -139,10 +150,12 @@ class V2C02:
         elif address == 0x0006:
             return 0
         elif address == 0x0007:
-            return 0
+            data = np.uint8(self.read(self.reg_PPUADDR))
+            self.reg_PPUADDR += 1
+            return data
 
     def write(self, address, data):
-        self.bus.write(address, data)
+        self.bus.ppu_write(address, data)
 
     def read(self, address):
-        return self.bus.read(address)
+        return self.bus.ppu_read(address)

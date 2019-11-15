@@ -133,10 +133,16 @@ class CPU:
 def main():
 
 
-    v = np.uint8(0x00)
-    print(v)
-    print((v - 1) & 0x00FF)
+    v = 0x3F00
+    print(hex(v))
+    v += 0x001F
+    print(hex(v))
+    v += 5
+    print(hex(v & 0x3F1F))
 
+
+
+    return
 
     program = input()
 

@@ -15,23 +15,31 @@ class NES:
         self.cpu = R6502()
         self.ram = RAM(1024 * 2)
         self.ppu = V2C02(self.game)
+        self.vram = RAM(1024 * 16)
 
         self.cpu.connect_bus(self.bus)
         self.bus.connect_cpu(self.cpu)
         self.bus.connect_ram(self.ram)
         self.bus.connect_ppu(self.ppu)
 
+        self.ppu.connect_bus(self.bus)
+        self.bus.connect_vram(self.vram)
+
         self.total_cycles = 0
 
     def clock(self):
 
-        for event in self.game.event.get():
-            if event.type == self.game.KEYDOWN and event.key == self.game.K_ESCAPE:
-                return False
+        #for event in self.game.event.get():
+        #    if event.type == self.game.KEYDOWN and event.key == self.game.K_ESCAPE:
+        #        return False
 
         self.ppu.clock()
         if (self.total_cycles % 3) == 0:
             self.cpu.clock()
+
+        if self.ppu.nmi:
+            self.ppu.nmi = False
+            self.cpu.nmi()
 
         self.total_cycles += 1
 
@@ -149,7 +157,12 @@ def run_pputest(console):
             break
         cpu_state = console.cpu.get_internal_state()
         if cpu_state != ():
-            print(cpu_state)
+            #print(str(console.total_cycles) + " " + str(cpu_state))
+            if console.total_cycles == 713464:
+                console.vram.print_contents(0x0000, 0x03FF, 32)
+                #print("")
+                #console.vram.print_contents(0x0400, 0x07FF, 32)
+
 
 
 

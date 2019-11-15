@@ -83,6 +83,30 @@ class R6502:
         self.total_cycles = 0
         return 0
 
+    def nmi(self):
+        self.push(self.reg_PC >> 8)
+        self.push(self.reg_PC)
+
+        self.flag_B = False
+        self.flag_U = True
+        self.flag_I = True
+        p = (int(self.flag_N) << 7) | \
+            (int(self.flag_V) << 6) | \
+            (int(self.flag_U) << 5) | \
+            (int(self.flag_B) << 4) | \
+            (int(self.flag_D) << 3) | \
+            (int(self.flag_I) << 2) | \
+            (int(self.flag_Z) << 1) | \
+            (int(self.flag_C) << 0)
+        self.push(p)
+
+        self.absolute_address = 0xFFFA
+        low = self.read(self.absolute_address) & 0x00FF
+        high = self.read(self.absolute_address + 1) & 0x00FF
+        self.reg_PC = (high << 8) | low
+
+        self.current_instruction.cycles = 8
+
     # Debug
     def single_line_print(self):
         if self.debug:
@@ -136,10 +160,10 @@ class R6502:
     #
     # Bus Helpers
     def read(self, address):
-        return np.uint8(self.bus.cpu_bus_read(address))
+        return np.uint8(self.bus.cpu_read(address, True))
 
     def write(self, address, data):
-        self.bus.cpu_bus_write(address, data)
+        self.bus.cpu_write(address, data)
 
     def check_page_boundary(self, base_address, indexed_address):
         if self.current_instruction.op_code in (0x10, 0x11, 0x19, 0x1C, 0x1D,
@@ -156,13 +180,13 @@ class R6502:
     #
     # Stack Helpers
     def push(self, value):
-        self.write(0x0100 + self.reg_S, value)
+        self.write(0x0100 + self.reg_S, value & 0x00FF)
         self.reg_S = (self.reg_S - 1) & 0x00FF
 
     def pop(self):
         self.reg_S = (self.reg_S + 1) & 0x00FF
         value = self.read(0x0100 + self.reg_S)
-        return value
+        return value & 0x00FF
 
     #
     # Flags Helpers

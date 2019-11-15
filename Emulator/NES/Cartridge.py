@@ -60,7 +60,13 @@ class Cartridge:
         if success:
             return self.prg_data[mapped_address]
 
+    def cpu_write(self, address, data):
+        return 0
+
     def ppu_read(self, address):
         success, mapped_address = self.mapper.chr_read(address)
         if success:
             return self.chr_data[mapped_address]
+
+    def ppu_write(self, address, data):
+        return 0
