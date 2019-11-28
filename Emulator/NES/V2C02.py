@@ -9,17 +9,17 @@ palColors = [
     [(236, 238, 236), (168, 204, 236), (188, 188, 236), (212, 178, 236), (236, 174, 236), (236, 174, 212), (236, 180, 176), (228, 196, 144), (204, 210, 120), (180, 222, 120), (168, 226, 144), (152, 226, 180), (160, 214, 228), (160, 162, 160)]
 ]
 
-PPUCTRL_NN = 0x0000
-PPUCTRL_I = 0x0000
-PPUCTRL_S = 0x0000
-PPUCTRL_B = 0x0000
-PPUCTRL_H = 0x0000
-PPUCTRL_P = 0x0000
-PPUCTRL_V = 0x0000
+PPUCTRL_NN = 0x0003
+PPUCTRL_I = 0x0004
+PPUCTRL_S = 0x0008
+PPUCTRL_B = 0x0010
+PPUCTRL_H = 0x0020
+PPUCTRL_P = 0x0040
+PPUCTRL_V = 0x0080
 
-PPUSTATUS_O = (1 << 5)
-PPUSTATUS_S = (1 << 6)
-PPUSTATUS_V = (1 << 7)
+PPUSTATUS_O = 0x0020
+PPUSTATUS_S = 0x0040
+PPUSTATUS_V = 0x0080
 
 
 class V2C02:
@@ -74,13 +74,14 @@ class V2C02:
 
     def clock(self):
 
-        self.reg_PPUSTATUS |= (int(self.render_y >= self.screen_height_limit) << 7)
-        if self.render_y == self.screen_height_limit and self.render_x == 0:
+        self.reg_PPUSTATUS |= int(self.screen_height_limit <= self.render_y <= self.scan_height_limit) * PPUSTATUS_V
+
+        if (self.reg_PPUCTRL & PPUCTRL_V) != 0 and self.render_y == self.screen_height_limit and self.render_x == 0:
             self.nmi = True
 
-        if self.render_x < self.screen_width_limit and 0 < self.render_y < self.screen_height_limit:
-            r = random.randint(0, 1)
-            #self.screen.set_at((self.render_x, self.render_y), (r * 255, r * 255, r * 255))
+        #if self.render_x < self.screen_width_limit and 0 < self.render_y < self.screen_height_limit:
+        #   r = random.randint(0, 1)
+        #   self.screen.set_at((self.render_x, self.render_y), (r * 255, r * 255, r * 255))
 
         self.render_x += 1
         if self.render_x == self.scan_width_limit:
@@ -113,13 +114,12 @@ class V2C02:
             self.reg_OAMADDR = data
         elif address == 0x0004:
             self.reg_OAMDATA = data
-
         elif address == 0x0005:
             self.reg_PPUSCROLL = data
 
         elif address == 0x0006:
             if not self.ppu_address_latch:
-                self.reg_PPUADDR = (self.reg_PPUADDR & 0x00FF) | (data << 8)
+                self.reg_PPUADDR = ((data << 8) & 0xFF00) | (self.reg_PPUADDR & 0x00FF)
                 self.ppu_address_latch = True
             else:
                 self.reg_PPUADDR = (self.reg_PPUADDR & 0xFF00) | data
@@ -127,17 +127,17 @@ class V2C02:
 
         elif address == 0x0007:
             self.write(self.reg_PPUADDR, data)
+
             self.reg_PPUADDR += 1
 
     def cpu_read(self, address, read):
         if address == 0x0000:
-            return 0
+            return self.reg_PPUCTRL
         elif address == 0x0001:
             return 0
         elif address == 0x0002:
             self.reg_PPUSTATUS |= PPUSTATUS_V
             data = self.reg_PPUSTATUS & 0xE0
-
             self.reg_PPUSTATUS &= ~PPUSTATUS_V
             self.ppu_address_latch = False
             return data
@@ -150,8 +150,14 @@ class V2C02:
         elif address == 0x0006:
             return 0
         elif address == 0x0007:
-            data = np.uint8(self.read(self.reg_PPUADDR))
-            self.reg_PPUADDR += 1
+
+            data = self.ppu_data_delay
+            self.ppu_data_delay = np.uint8(self.read(self.reg_PPUADDR))
+
+            if self.reg_PPUADDR >= 0x3F00:
+                data = self.ppu_data_delay
+
+            #self.reg_PPUADDR += 1
             return data
 
     def write(self, address, data):

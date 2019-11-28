@@ -23,6 +23,6 @@ class RAM:
     def print_contents(self, lower_bound, upper_bound, step):
         for p in range(lower_bound, upper_bound, step):
             s = "$%04X:" % p + " "
-            for i in range(step + 1):
+            for i in range(step):
                 s += "%02X" % self.memory[p + i] + " "
             print(s)

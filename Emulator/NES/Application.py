@@ -37,7 +37,7 @@ class NES:
         if (self.total_cycles % 3) == 0:
             self.cpu.clock()
 
-        if self.ppu.nmi:
+        if self.ppu.nmi and False:
             self.ppu.nmi = False
             self.cpu.nmi()
 
@@ -152,24 +152,40 @@ def run_pputest(console):
 
     load_nestest_log("Resources/nestest.log")
 
+    did_print = False
     while True:
         if not console.clock():
             break
         cpu_state = console.cpu.get_internal_state()
         if cpu_state != ():
-            #print(str(console.total_cycles) + " " + str(cpu_state))
-            if console.total_cycles == 713464:
-                console.vram.print_contents(0x0000, 0x03FF, 32)
+            if not did_print:
+                print(str(console.total_cycles) + " " + hex(cpu_state[0]))
+                did_print = True
+            if console.total_cycles > 350000:
+                #print("$3F00: " + "%02X" % console.bus.vram.read(0x3F00))
+                #console.bus.print_vram_contents(0x3F01, 0x3F1F, 4)
                 #print("")
-                #console.vram.print_contents(0x0400, 0x07FF, 32)
-
-
-
-
+                #console.vram.print_contents(0x3F00, 0x3F10, 16)
+                #print("")
+                console.vram.print_contents(0x0000, 0x03FF, 32)
+                print("")
+                console.bus.print_vram_contents(0x2000, 0x23FF, 32)
+                print("")
+                #console.bus.print_vram_contents(0x2800, 0x2BFF, 32)
+                #print("")
+                #console.bus.print_vram_contents(0x2C00, 0x2FFF, 32)
+                break
+        else:
+            did_print = True
 
 def main():
 
     np.seterr(over="ignore")
+
+    #ram = RAM(4 * 1024)
+    #for i in range(0x0000, 0x0020 + 32):
+    #    ram.write(i, i + 1)
+    #ram.print_contents(0x0000, 0x0020, 32)
 
     console = NES()
     run_pputest(console)
